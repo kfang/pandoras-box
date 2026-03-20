@@ -1,7 +1,7 @@
 .PHONY: dev build clean check deps
 
 dev: deps
-	go run ./cmd/mnemosyne --import ./tmp/import --library ./tmp/library
+	go run ./cmd/mnemosyne
 
 build:
 	go build -o bin/mnemosyne ./cmd/mnemosyne
