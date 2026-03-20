@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mnemosyne</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f7fafc;
+      color: #2d3748;
+    }
+
+    .shell {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    header h1 { font-size: 1.5rem; }
+
+    .tabs {
+      display: flex;
+      gap: 0.25rem;
+      margin-left: auto;
+    }
+
+    .tabs button {
+      padding: 0.5rem 1rem;
+      border: 1px solid #e2e8f0;
+      background: white;
+      cursor: pointer;
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+    }
+
+    .tabs button.active {
+      background: #2d3748;
+      color: white;
+      border-color: #2d3748;
+    }
+
+    .badge {
+      background: #e53e3e;
+      color: white;
+      border-radius: 9999px;
+      padding: 0.1rem 0.5rem;
+      font-size: 0.75rem;
+      margin-left: 0.25rem;
+    }
+
+    .scan-btn {
+      padding: 0.5rem 1rem;
+      border: 1px solid #e2e8f0;
+      background: white;
+      cursor: pointer;
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+    }
+
+    .scan-btn:hover { background: #edf2f7; }
+    .scan-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .connection { font-size: 0.75rem; color: #e53e3e; }
+    .connection.connected { color: #38a169; }
+
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      margin-bottom: 1rem;
+      font-size: 0.875rem;
+    }
+
+    .breadcrumb button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #4a90d9;
+      padding: 0.25rem;
+      font-size: 0.875rem;
+    }
+
+    .breadcrumb button:hover { text-decoration: underline; }
+    .breadcrumb .sep { color: #a0aec0; }
+
+    .entries {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 1rem;
+    }
+
+    .folder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem 1rem;
+      cursor: pointer;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.5rem;
+      background: white;
+      font-size: 0.875rem;
+      font-weight: 500;
+      width: 100%;
+      text-align: center;
+    }
+
+    .folder:hover { background: #edf2f7; }
+
+    .image-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 0.5rem;
+      overflow: hidden;
+      background: white;
+    }
+
+    .thumb-wrap {
+      position: relative;
+    }
+
+    .image-card img {
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: cover;
+      display: block;
+      background: #edf2f7;
+    }
+
+    .type-badge {
+      position: absolute;
+      top: 0.375rem;
+      right: 0.375rem;
+      padding: 0.125rem 0.375rem;
+      border-radius: 0.25rem;
+      font-size: 0.625rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
+      line-height: 1.2;
+      color: white;
+    }
+
+    .type-badge.raw { background: #d69e2e; }
+    .type-badge.video { background: #e53e3e; }
+    .type-badge.jpeg { background: #38a169; }
+    .type-badge.other { background: #718096; }
+
+    .image-card .name {
+      padding: 0.5rem;
+      font-size: 0.75rem;
+      color: #4a5568;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .import-item {
+      display: flex;
+      gap: 1rem;
+      padding: 0.5rem;
+      border-bottom: 1px solid #e2e8f0;
+      align-items: center;
+    }
+
+    .import-item .filename {
+      flex: 1;
+      font-family: monospace;
+      font-size: 0.875rem;
+    }
+
+    .import-item .state {
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .state-queued { color: #718096; }
+    .state-processing { color: #d69e2e; }
+    .state-done { color: #38a169; }
+    .state-error { color: #e53e3e; }
+
+    .import-item .message {
+      font-size: 0.75rem;
+      color: #718096;
+    }
+
+    .empty {
+      color: #a0aec0;
+      text-align: center;
+      padding: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell" x-data="app()" x-init="init()">
+    <header>
+      <h1>Mnemosyne</h1>
+      <nav class="tabs">
+        <button :class="{ active: view === 'browse' }" @click="view = 'browse'">Library</button>
+        <button :class="{ active: view === 'import' }" @click="view = 'import'">
+          Import
+          <template x-if="activeCount > 0">
+            <span class="badge" x-text="activeCount"></span>
+          </template>
+        </button>
+      </nav>
+      <button class="scan-btn" @click="scan()" :disabled="scanning" x-text="scanning ? 'Scanning...' : 'Scan Import'"></button>
+      <span class="connection" :class="{ connected }" x-text="connected ? 'Connected' : 'Disconnected'"></span>
+    </header>
+
+    <!-- Browse view -->
+    <template x-if="view === 'browse'">
+      <div>
+        <div class="breadcrumb">
+          <button @click="browse('')">Library</button>
+          <template x-for="seg in pathSegments()" :key="seg.path">
+            <span>
+              <span class="sep">/</span>
+              <button @click="browse(seg.path)" x-text="seg.name"></button>
+            </span>
+          </template>
+        </div>
+
+        <div class="entries">
+          <template x-if="currentPath">
+            <button class="folder" @click="navigateUp()">..</button>
+          </template>
+
+          <template x-for="e in folders" :key="currentPath + '/' + e.name">
+            <button class="folder" @click="browse(currentPath ? currentPath + '/' + e.name : e.name)" x-text="e.name"></button>
+          </template>
+
+          <template x-for="e in images" :key="currentPath + '/' + e.name">
+            <div class="image-card">
+              <div class="thumb-wrap">
+                <img :src="'/api/thumbnail/' + (currentPath ? currentPath + '/' + e.name : e.name)" :alt="e.name" loading="lazy" />
+                <span class="type-badge" :class="fileType(e.name).type" x-text="fileType(e.name).label"></span>
+              </div>
+              <div class="name" x-text="e.name"></div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+
+    <!-- Import view -->
+    <template x-if="view === 'import'">
+      <div>
+        <template x-if="statuses.length === 0">
+          <p class="empty">No import activity yet.</p>
+        </template>
+        <template x-for="s in statuses" :key="s.file">
+          <div class="import-item">
+            <span class="filename" x-text="s.file.split('/').pop()"></span>
+            <span class="state" :class="'state-' + s.state" x-text="s.state"></span>
+            <template x-if="s.message">
+              <span class="message" x-text="s.message"></span>
+            </template>
+          </div>
+        </template>
+      </div>
+    </template>
+  </div>
+
+  <script>
+    const MEDIA_EXTS = new Set([
+      ".jpg", ".jpeg", ".png", ".tiff", ".tif", ".webp",
+      ".heic", ".heif", ".avif",
+      ".cr2", ".cr3", ".nef", ".arw", ".raf", ".orf",
+      ".rw2", ".dng", ".pef", ".srw", ".x3f", ".iiq",
+      ".mov", ".mp4", ".avi", ".mkv", ".mts", ".m2ts",
+      ".wmv", ".webm", ".m4v",
+    ]);
+
+    const RAW_EXTS = new Set([
+      ".cr2", ".cr3", ".nef", ".arw", ".raf", ".orf",
+      ".rw2", ".dng", ".pef", ".srw", ".x3f", ".iiq",
+    ]);
+
+    const VIDEO_EXTS = new Set([
+      ".mov", ".mp4", ".avi", ".mkv", ".mts", ".m2ts",
+      ".wmv", ".webm", ".m4v",
+    ]);
+
+    function isMedia(name) {
+      const dot = name.lastIndexOf(".");
+      return dot !== -1 && MEDIA_EXTS.has(name.slice(dot).toLowerCase());
+    }
+
+    function app() {
+      return {
+        view: "browse",
+        connected: false,
+        scanning: false,
+        currentPath: "",
+        entries: [],
+        statuses: [],
+
+        get folders() {
+          return this.entries.filter(e => e.isDir);
+        },
+        get images() {
+          return this.entries.filter(e => !e.isDir && isMedia(e.name));
+        },
+        get activeCount() {
+          return this.statuses.filter(s => s.state === "queued" || s.state === "processing").length;
+        },
+
+        init() {
+          this.browse("");
+          this.connectWs();
+        },
+
+        async browse(path) {
+          this.currentPath = path;
+          this.entries = [];
+          try {
+            const res = await fetch("/api/browse?path=" + encodeURIComponent(path));
+            if (res.ok) {
+              this.entries = await res.json() ?? [];
+            }
+          } catch {
+            this.entries = [];
+          }
+        },
+
+        async scan() {
+          this.scanning = true;
+          try {
+            await fetch("/api/scan", { method: "POST" });
+          } catch {}
+          this.scanning = false;
+        },
+
+        fileType(name) {
+          const ext = name.slice(name.lastIndexOf(".")).toLowerCase();
+          if (RAW_EXTS.has(ext)) return { type: "raw", label: ext.slice(1) };
+          if (VIDEO_EXTS.has(ext)) return { type: "video", label: ext.slice(1) };
+          if (ext === ".jpg" || ext === ".jpeg") return { type: "jpeg", label: "jpg" };
+          return { type: "other", label: ext.slice(1) };
+        },
+
+        navigateUp() {
+          const parts = this.currentPath.split("/").filter(Boolean);
+          parts.pop();
+          this.browse(parts.join("/"));
+        },
+
+        pathSegments() {
+          const parts = this.currentPath.split("/").filter(Boolean);
+          return parts.map((name, i) => ({
+            name,
+            path: parts.slice(0, i + 1).join("/"),
+          }));
+        },
+
+        connectWs() {
+          const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+          const ws = new WebSocket(protocol + "//" + location.host + "/ws");
+          ws.onopen = () => { this.connected = true; };
+          ws.onclose = () => {
+            this.connected = false;
+            setTimeout(() => this.connectWs(), 2000);
+          };
+          ws.onmessage = (event) => {
+            const status = JSON.parse(event.data);
+            const idx = this.statuses.findIndex(s => s.file === status.file);
+            if (idx >= 0) {
+              this.statuses[idx] = status;
+            } else {
+              this.statuses = [status, ...this.statuses].slice(0, 200);
+            }
+          };
+        },
+      };
+    }
+  </script>
+</body>
+</html>
