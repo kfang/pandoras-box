@@ -9,20 +9,18 @@ A cross-platform desktop application for organizing and sorting large photo libr
 **Linux (Debian/Ubuntu):**
 
 ```bash
-sudo apt install libwebkit2gtk-4.1-dev librsvg2-dev exiftool
+sudo apt install libwebkit2gtk-4.1-dev librsvg2-dev
 ```
 
 **macOS:**
 
 ```bash
-brew install exiftool
-# Xcode Command Line Tools are also required
+# Xcode Command Line Tools are required
 xcode-select --install
 ```
 
 **Windows:**
 
-- Install [exiftool](https://exiftool.org/) and ensure it's on your PATH
 - Install [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (usually pre-installed on Windows 10+)
 
 ### Development tools
@@ -43,6 +41,9 @@ mise install
 ```bash
 # Install Node.js dependencies
 npm install
+
+# Download and bundle exiftool as a sidecar binary
+bash scripts/setup-exiftool.sh
 
 # Start the app in development mode (hot-reloads frontend, rebuilds Rust on change)
 npm run tauri dev
@@ -68,13 +69,16 @@ This compiles the frontend, builds the Rust binary in release mode, and produces
 
 ```
 mnemosyne/
-├── src/              # React + TypeScript frontend
-├── src-tauri/        # Rust backend
+├── src/                # React + TypeScript frontend
+├── src-tauri/          # Rust backend
+│   ├── binaries/       # Sidecar binaries (gitignored, populated by setup script)
 │   └── src/
-│       ├── main.rs   # App entry point
-│       └── lib.rs    # Tauri commands
-├── mise.toml         # Tool versions and tasks
-├── vite.config.ts    # Vite bundler config
+│       ├── main.rs     # App entry point
+│       └── lib.rs      # Tauri commands (includes exiftool sidecar invocation)
+├── scripts/
+│   └── setup-exiftool.sh  # Downloads exiftool for bundling
+├── mise.toml           # Tool versions and env vars
+├── vite.config.ts      # Vite bundler config
 └── package.json
 ```
 

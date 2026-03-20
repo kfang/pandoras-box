@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Sidecar binaries (downloaded via scripts/setup-exiftool.sh)
+src-tauri/binaries/
+
 # Editor directories and files
 .vscode/
 .idea/
