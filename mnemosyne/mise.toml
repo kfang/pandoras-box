@@ -1,7 +1,0 @@
-[tools]
-node = "24"
-rust = "1.94"
-
-[env]
-# Tauri dev server port
-TAURI_DEV_PORT = "1420"
