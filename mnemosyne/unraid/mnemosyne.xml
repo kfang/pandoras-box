@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Mnemosyne</Name>
+  <Repository>ghcr.io/kfang/mnemosyne:latest</Repository>
+  <Registry>https://ghcr.io/kfang/mnemosyne</Registry>
+  <Branch>
+    <Tag>latest</Tag>
+    <TagDescription>Latest stable release</TagDescription>
+  </Branch>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/kfang/mnemosyne</Support>
+  <Overview>Photo and video import organizer. Watches an import folder, reads EXIF metadata, and sorts files into date-based folders. Includes a web UI for browsing the library.</Overview>
+  <Category>MediaApp:Photos</Category>
+  <WebUI>http://[IP]:[PORT:8080]</WebUI>
+  <Icon>https://raw.githubusercontent.com/kfang/mnemosyne/main/unraid/icon.png</Icon>
+  <ExtraParams/>
+  <Description>Photo and video import organizer with web UI.</Description>
+  <Config Name="Web UI Port" Target="8080" Default="8080" Mode="tcp" Description="Port for the web interface" Type="Port" Display="always" Required="true">8080</Config>
+  <Config Name="Import Directory" Target="/data/import" Default="/mnt/user/photos/import" Mode="rw" Description="Folder to watch for new photos/videos" Type="Path" Display="always" Required="true">/mnt/user/photos/import</Config>
+  <Config Name="Library Directory" Target="/data/library" Default="/mnt/user/photos/library" Mode="rw" Description="Root folder of the organized photo library" Type="Path" Display="always" Required="true">/mnt/user/photos/library</Config>
+  <Config Name="Import Dir (env)" Target="MNEMOSYNE_IMPORT_DIR" Default="/data/import" Description="Import directory inside container" Type="Variable" Display="advanced" Required="true">/data/import</Config>
+  <Config Name="Library Dir (env)" Target="MNEMOSYNE_LIBRARY_DIR" Default="/data/library" Description="Library directory inside container" Type="Variable" Display="advanced" Required="true">/data/library</Config>
+  <Config Name="Listen Address" Target="MNEMOSYNE_ADDR" Default=":8080" Description="Web server listen address" Type="Variable" Display="advanced" Required="false">:8080</Config>
+  <Config Name="Workers" Target="MNEMOSYNE_WORKERS" Default="4" Description="Number of parallel import workers" Type="Variable" Display="advanced" Required="false">4</Config>
+</Container>
