@@ -266,9 +266,9 @@
     <header>
       <h1>Mnemosyne</h1>
       <nav class="tabs">
-        <button :class="{ active: view === 'browse' }" @click="view = 'browse'">Library</button>
+        <button :class="{ active: view === 'browse' }" @click="view = 'browse'; updateHash()">Library</button>
         <button :class="{ active: view === 'trash' }" @click="view = 'trash'; browseTrash('')">Trash</button>
-        <button :class="{ active: view === 'import' }" @click="view = 'import'">
+        <button :class="{ active: view === 'import' }" @click="view = 'import'; updateHash()">
           Import
           <template x-if="activeCount > 0">
             <span class="badge" x-text="activeCount"></span>
@@ -468,8 +468,35 @@
         },
 
         init() {
-          this.browse("");
+          this.loadFromHash();
           this.connectWs();
+          window.addEventListener("hashchange", () => this.loadFromHash());
+        },
+
+        loadFromHash() {
+          const hash = location.hash.replace(/^#\/?/, "");
+          if (hash.startsWith("trash")) {
+            this.view = "trash";
+            this.browseTrash(hash.replace(/^trash\/?/, ""));
+          } else if (hash === "import") {
+            this.view = "import";
+          } else {
+            this.view = "browse";
+            const path = hash.replace(/^library\/?/, "");
+            this.browse(path);
+          }
+        },
+
+        updateHash() {
+          let hash;
+          if (this.view === "trash") {
+            hash = this.trashPath ? "trash/" + this.trashPath : "trash";
+          } else if (this.view === "import") {
+            hash = "import";
+          } else {
+            hash = this.currentPath ? "library/" + this.currentPath : "";
+          }
+          history.replaceState(null, "", "#/" + hash);
         },
 
         async browse(path) {
@@ -477,6 +504,7 @@
           this.entries = [];
           this.selected = new Set();
           this.selecting = false;
+          this.updateHash();
           try {
             const res = await fetch("/api/browse?path=" + encodeURIComponent(path));
             if (res.ok) {
@@ -525,6 +553,7 @@
           this.trashEntries = [];
           this.trashSelected = new Set();
           this.trashSelecting = false;
+          this.updateHash();
           try {
             const res = await fetch("/api/browse?path=" + encodeURIComponent(".trash/" + path));
             if (res.ok) {
