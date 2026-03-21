@@ -24,8 +24,13 @@ func main() {
 		log.Fatalf("failed to resolve library path: %v", err)
 	}
 
-	imp := importer.New(absLibrary, workers)
-	w, err := watcher.New(importDir, imp)
+	absImport, err := filepath.Abs(importDir)
+	if err != nil {
+		log.Fatalf("failed to resolve import path: %v", err)
+	}
+
+	imp := importer.New(absImport, absLibrary, workers)
+	w, err := watcher.New(absImport, imp)
 	if err != nil {
 		log.Fatalf("failed to create watcher: %v", err)
 	}

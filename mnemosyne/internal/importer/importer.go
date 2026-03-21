@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/kfang/mnemosyne/internal/metadata"
@@ -21,6 +22,7 @@ type Status struct {
 
 type Importer struct {
 	libraryDir string
+	importDir  string
 	queue      chan string
 	done       chan struct{}
 	workers    int
@@ -29,9 +31,10 @@ type Importer struct {
 	subscribers []chan Status
 }
 
-func New(libraryDir string, workers int) *Importer {
+func New(importDir, libraryDir string, workers int) *Importer {
 	imp := &Importer{
 		libraryDir: libraryDir,
+		importDir:  importDir,
 		queue:      make(chan string, 1000),
 		done:       make(chan struct{}),
 		workers:    workers,
@@ -120,6 +123,7 @@ func (imp *Importer) processFile(path string) {
 		// Destination exists — check if identical
 		if filesEqual(path, destPath) {
 			os.Remove(path)
+			removeEmptyParents(filepath.Dir(path), imp.importDir)
 			imp.broadcast(Status{File: path, State: "done", Message: "duplicate removed"})
 			log.Printf("duplicate removed: %s", filepath.Base(path))
 			return
@@ -133,6 +137,7 @@ func (imp *Importer) processFile(path string) {
 		imp.broadcast(Status{File: path, State: "error", Message: err.Error()})
 		return
 	}
+	removeEmptyParents(filepath.Dir(path), imp.importDir)
 
 	// Generate thumbnail
 	thumbDir := filepath.Join(imp.libraryDir, ".thumbnails")
@@ -142,6 +147,18 @@ func (imp *Importer) processFile(path string) {
 
 	imp.broadcast(Status{File: path, State: "done", Message: destPath})
 	log.Printf("imported %s -> %s", filepath.Base(path), destPath)
+}
+
+// removeEmptyParents removes empty directories walking up from dir, stopping at stopAt.
+func removeEmptyParents(dir, stopAt string) {
+	for dir != stopAt && strings.HasPrefix(dir, stopAt) {
+		entries, err := os.ReadDir(dir)
+		if err != nil || len(entries) > 0 {
+			return
+		}
+		os.Remove(dir)
+		dir = filepath.Dir(dir)
+	}
 }
 
 // moveFile tries os.Rename first, falling back to copy+delete for cross-device moves.

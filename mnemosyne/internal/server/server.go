@@ -157,6 +157,7 @@ func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {
 			errors = append(errors, relPath+": "+err.Error())
 			continue
 		}
+		removeEmptyParents(filepath.Dir(srcPath), s.libraryDir)
 	}
 
 	resp := struct {
@@ -205,6 +206,7 @@ func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
 			errors = append(errors, relPath+": "+err.Error())
 			continue
 		}
+		removeEmptyParents(filepath.Dir(srcPath), trashDir)
 	}
 
 	resp := struct {
@@ -232,6 +234,18 @@ func (s *Server) handleEmptyTrash(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+// removeEmptyParents removes empty directories walking up from dir, stopping at stopAt.
+func removeEmptyParents(dir, stopAt string) {
+	for dir != stopAt && strings.HasPrefix(dir, stopAt) {
+		entries, err := os.ReadDir(dir)
+		if err != nil || len(entries) > 0 {
+			return
+		}
+		os.Remove(dir)
+		dir = filepath.Dir(dir)
+	}
 }
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
