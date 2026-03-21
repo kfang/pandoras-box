@@ -2,16 +2,21 @@ package server
 
 import (
 	"encoding/json"
+	"image"
+	"image/jpeg"
 	"log"
+	"math/bits"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/gorilla/websocket"
 	"github.com/kfang/mnemosyne/internal/importer"
 	"github.com/kfang/mnemosyne/internal/metadata"
 	"github.com/kfang/mnemosyne/internal/thumbnail"
+	"golang.org/x/image/draw"
 )
 
 var upgrader = websocket.Upgrader{
@@ -41,6 +46,7 @@ func New(addr, libraryDir string, imp *importer.Importer, scanFn ScanFunc) *Serv
 	mux.HandleFunc("/api/thumbnail/", s.handleThumbnail)
 	mux.HandleFunc("/api/file/", s.handleFile)
 	mux.HandleFunc("/api/preview/", s.handlePreview)
+	mux.HandleFunc("/api/duplicates", s.handleDuplicates)
 	mux.HandleFunc("/api/scan", s.handleScan)
 	mux.HandleFunc("/api/trash", s.handleTrash)
 	mux.HandleFunc("/api/trash/empty", s.handleEmptyTrash)
@@ -276,6 +282,149 @@ func (s *Server) handleEmptyTrash(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+var mediaExtensions = map[string]bool{
+	".jpg": true, ".jpeg": true, ".png": true, ".tiff": true, ".tif": true,
+	".webp": true, ".heic": true, ".heif": true, ".avif": true,
+	".cr2": true, ".cr3": true, ".nef": true, ".arw": true,
+	".raf": true, ".orf": true, ".rw2": true, ".dng": true,
+	".pef": true, ".srw": true, ".x3f": true, ".iiq": true,
+	".mov": true, ".mp4": true, ".avi": true, ".mkv": true,
+	".mts": true, ".m2ts": true, ".wmv": true, ".webm": true,
+	".m4v": true,
+}
+
+func (s *Server) handleDuplicates(w http.ResponseWriter, r *http.Request) {
+	relPath := r.URL.Query().Get("path")
+	dir := filepath.Join(s.libraryDir, filepath.Clean("/"+relPath))
+
+	if !strings.HasPrefix(dir, s.libraryDir) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	thumbDir := filepath.Join(s.libraryDir, ".thumbnails")
+
+	type fileEntry struct {
+		absPath string
+		relPath string
+		hash    uint64
+	}
+
+	// Walk directory, compute dHash for each media file's thumbnail
+	var files []fileEntry
+	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() && strings.HasPrefix(info.Name(), ".") {
+			return filepath.SkipDir
+		}
+		if info.IsDir() {
+			return nil
+		}
+		ext := strings.ToLower(filepath.Ext(info.Name()))
+		if !mediaExtensions[ext] {
+			return nil
+		}
+		thumbPath := thumbnail.ThumbPath(path, thumbDir)
+		// Generate thumbnail on demand if missing
+		if _, err := os.Stat(thumbPath); err != nil {
+			thumbnail.Generate(path, thumbDir)
+		}
+		h, err := dHash(thumbPath)
+		if err != nil {
+			return nil
+		}
+		rel, _ := filepath.Rel(s.libraryDir, path)
+		files = append(files, fileEntry{absPath: path, relPath: rel, hash: h})
+		return nil
+	})
+
+	// Union-Find to cluster visually similar images
+	parent := make([]int, len(files))
+	for i := range parent {
+		parent[i] = i
+	}
+	var find func(int) int
+	find = func(i int) int {
+		if parent[i] != i {
+			parent[i] = find(parent[i])
+		}
+		return parent[i]
+	}
+	union := func(i, j int) {
+		pi, pj := find(i), find(j)
+		if pi != pj {
+			parent[pi] = pj
+		}
+	}
+
+	threshold := 10
+	if t, err := strconv.Atoi(r.URL.Query().Get("threshold")); err == nil && t >= 0 && t <= 64 {
+		threshold = t
+	}
+	for i := 0; i < len(files); i++ {
+		for j := i + 1; j < len(files); j++ {
+			if hammingDist(files[i].hash, files[j].hash) <= threshold {
+				union(i, j)
+			}
+		}
+	}
+
+	// Collect groups
+	clusters := map[int][]string{}
+	for i, f := range files {
+		root := find(i)
+		clusters[root] = append(clusters[root], f.relPath)
+	}
+
+	type dupGroup struct {
+		Files []string `json:"files"`
+	}
+	var groups []dupGroup
+	for _, g := range clusters {
+		if len(g) >= 2 {
+			groups = append(groups, dupGroup{Files: g})
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(groups)
+}
+
+// dHash computes a 64-bit difference hash from a JPEG thumbnail.
+// The image is resized to 9x8 grayscale, then each pixel is compared
+// to its right neighbor to produce a 64-bit perceptual fingerprint.
+func dHash(imagePath string) (uint64, error) {
+	f, err := os.Open(imagePath)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+
+	img, err := jpeg.Decode(f)
+	if err != nil {
+		return 0, err
+	}
+
+	gray := image.NewGray(image.Rect(0, 0, 9, 8))
+	draw.ApproxBiLinear.Scale(gray, gray.Bounds(), img, img.Bounds(), draw.Over, nil)
+
+	var hash uint64
+	for y := 0; y < 8; y++ {
+		for x := 0; x < 8; x++ {
+			if gray.GrayAt(x, y).Y > gray.GrayAt(x+1, y).Y {
+				hash |= 1 << uint(y*8+x)
+			}
+		}
+	}
+	return hash, nil
+}
+
+func hammingDist(a, b uint64) int {
+	return bits.OnesCount64(a ^ b)
 }
 
 // removeEmptyParents removes empty directories walking up from dir, stopping at stopAt.

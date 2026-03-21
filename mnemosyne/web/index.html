@@ -286,6 +286,196 @@
 
     .select-bar .trash-btn:hover { background: #c53030; }
 
+    .dup-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      padding: 0.75rem 1rem;
+      background: #2d3748;
+      color: white;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+    }
+
+    .dup-header button {
+      padding: 0.375rem 0.75rem;
+      border: 1px solid rgba(255,255,255,0.3);
+      background: transparent;
+      color: white;
+      cursor: pointer;
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+    }
+
+    .dup-header button:hover { background: rgba(255,255,255,0.1); }
+    .dup-header button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .dup-header .trash-btn {
+      background: #e53e3e;
+      border-color: #e53e3e;
+    }
+
+    .dup-header .trash-btn:hover { background: #c53030; }
+
+    .dup-group-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 1rem;
+    }
+
+    .dup-card {
+      border: 2px solid #e2e8f0;
+      border-radius: 0.5rem;
+      overflow: hidden;
+      background: white;
+      transition: border-color 0.15s;
+    }
+
+    .dup-card.marked {
+      border-color: #e53e3e;
+      opacity: 0.6;
+    }
+
+    .dup-card.comparing {
+      border-color: #4a90d9;
+    }
+
+    .dup-card .dup-thumb {
+      width: 100%;
+      aspect-ratio: 4/3;
+      object-fit: contain;
+      display: block;
+      background: #1a202c;
+    }
+
+    .dup-card .dup-info {
+      padding: 0.5rem;
+      font-size: 0.75rem;
+      color: #4a5568;
+    }
+
+    .dup-card .dup-info .dup-path {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .dup-card .dup-actions {
+      display: flex;
+      gap: 0.375rem;
+      margin-top: 0.375rem;
+    }
+
+    .dup-card .dup-actions button {
+      padding: 0.25rem 0.5rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.25rem;
+      font-size: 0.625rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      cursor: pointer;
+      background: white;
+    }
+
+    .dup-card .dup-actions button:hover { background: #edf2f7; }
+
+    .dup-btn-trash { color: #e53e3e; border-color: #e53e3e !important; }
+    .dup-btn-trash.active { background: #e53e3e !important; color: white; }
+    .dup-btn-compare { color: #4a90d9; border-color: #4a90d9 !important; }
+    .dup-btn-compare.active { background: #4a90d9 !important; color: white; }
+
+    .dup-label {
+      display: inline-block;
+      padding: 0.125rem 0.375rem;
+      border-radius: 0.25rem;
+      font-size: 0.625rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-top: 0.25rem;
+    }
+
+    .dup-label.keep { background: #c6f6d5; color: #276749; }
+    .dup-label.trash { background: #fed7d7; color: #9b2c2c; }
+
+    .dup-compare-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.95);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .dup-compare-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem 1rem;
+      background: #1a202c;
+      color: white;
+      font-size: 0.875rem;
+    }
+
+    .dup-compare-toolbar button {
+      padding: 0.375rem 0.75rem;
+      border: 1px solid rgba(255,255,255,0.3);
+      background: transparent;
+      color: white;
+      cursor: pointer;
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+    }
+
+    .dup-compare-toolbar button:hover { background: rgba(255,255,255,0.1); }
+
+    .dup-compare-panes {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+
+    .dup-compare-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      border-right: 1px solid #2d3748;
+    }
+
+    .dup-compare-pane:last-child { border-right: none; }
+
+    .dup-compare-pane .pane-label {
+      text-align: center;
+      padding: 0.375rem;
+      font-size: 0.75rem;
+      color: #a0aec0;
+      background: #1a202c;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .dup-compare-pane .pane-img {
+      flex: 1;
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+      cursor: grab;
+    }
+
+    .dup-compare-pane .pane-img.dragging { cursor: grabbing; }
+
+    .dup-compare-pane .pane-img img,
+    .dup-compare-pane .pane-img video {
+      position: absolute;
+      transform-origin: 0 0;
+      max-width: none;
+      max-height: none;
+      top: 0;
+      left: 0;
+    }
+
     .image-card.selectable { cursor: pointer; }
 
     .image-card.selected {
@@ -357,8 +547,14 @@
         </template>
 
         <template x-if="!selecting && images.length > 0">
-          <div style="margin-bottom: 1rem;">
+          <div style="margin-bottom: 1rem; display: flex; gap: 0.5rem;">
             <button class="scan-btn" @click="selecting = true">Select</button>
+            <button class="scan-btn" @click="findDuplicates()" :disabled="dupScanning" x-text="dupScanning ? 'Scanning...' : 'Find Duplicates'"></button>
+            <label style="display:flex; align-items:center; gap:0.375rem; font-size:0.8rem; color:#4a5568;">
+              Threshold
+              <input type="range" min="0" max="20" x-model.number="dupThreshold" style="width:80px;" />
+              <span x-text="dupThreshold" style="min-width:1.25rem;"></span>
+            </label>
           </div>
         </template>
 
@@ -384,6 +580,84 @@
             </div>
           </template>
         </div>
+      </div>
+    </template>
+
+    <!-- Duplicates review -->
+    <template x-if="view === 'duplicates'">
+      <div>
+        <div class="dup-header">
+          <button @click="dupBack()">&larr; Back</button>
+          <span x-text="'Group ' + (dupIndex + 1) + ' of ' + dupGroups.length + ' (' + dupGroups[dupIndex].files.length + ' files)'"></span>
+          <span style="margin-left: auto; display: flex; gap: 0.5rem;">
+            <button @click="dupCompareOpen()" :disabled="dupCompare.size < 2">Compare (<span x-text="dupCompare.size"></span>)</button>
+            <button @click="dupSkip()" :disabled="dupIndex >= dupGroups.length - 1">Skip</button>
+            <button class="trash-btn" @click="dupTrash()" :disabled="dupMarked.size === 0">Trash (<span x-text="dupMarked.size"></span>)</button>
+          </span>
+        </div>
+
+        <div class="dup-group-grid">
+          <template x-for="(file, fi) in dupGroups[dupIndex].files" :key="file">
+            <div class="dup-card" :class="{ marked: dupMarked.has(file), comparing: dupCompare.has(file) }">
+              <div class="thumb-wrap" style="position:relative;">
+                <img class="dup-thumb" :src="'/api/thumbnail/' + file" loading="lazy" />
+                <span class="type-badge" :class="fileType(file).type" x-text="fileType(file).label"></span>
+              </div>
+              <div class="dup-info">
+                <div class="dup-path" x-text="file"></div>
+                <div class="dup-actions">
+                  <button class="dup-btn-trash" :class="{ active: dupMarked.has(file) }" @click="toggleDupMark(file)" x-text="dupMarked.has(file) ? 'Marked' : 'Trash'"></button>
+                  <button class="dup-btn-compare" :class="{ active: dupCompare.has(file) }" @click="toggleDupCompare(file)" x-text="dupCompare.has(file) ? 'Selected' : 'Compare'"></button>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Compare overlay -->
+        <template x-if="dupComparing">
+          <div class="dup-compare-overlay" @keydown.escape.window="dupComparing = false">
+            <div class="dup-compare-toolbar">
+              <button @click="dupComparing = false">&larr; Close</button>
+              <span x-text="'Comparing ' + dupCompareFiles.length + ' files'"></span>
+              <span x-text="currentZoomPct + '%'" style="margin-left:auto; font-size:0.75rem; color:#a0aec0;"></span>
+              <button @click="zoomReset()">Fit</button>
+              <button @click="zoomTo(1)">100%</button>
+              <label style="display:flex; align-items:center; gap:0.375rem; font-size:0.75rem; color:#a0aec0;">
+                <input type="checkbox" x-model="zoomSynced" /> Sync
+              </label>
+            </div>
+            <div class="dup-compare-panes">
+              <template x-for="(file, pi) in dupCompareFiles" :key="'cmp-' + file">
+                <div class="dup-compare-pane">
+                  <div class="pane-label" x-text="file.split('/').pop()"></div>
+                  <div class="pane-img"
+                       @wheel.prevent="zoomWheel($event, pi)"
+                       @mousedown.prevent="panStart($event, pi)"
+                       @mousemove.prevent="panMove($event, pi)"
+                       @mouseup.prevent="panEnd()"
+                       @mouseleave="panEnd()"
+                       :class="{ dragging: panActive }"
+                       :data-pane="pi">
+                    <template x-if="isVideo(file)">
+                      <video :src="'/api/file/' + file" controls style="max-width:100%; max-height:100%;"></video>
+                    </template>
+                    <template x-if="isRaw(file)">
+                      <img :src="'/api/preview/' + file"
+                           :style="paneStyle(pi)"
+                           @load="zoomFit($event, pi)" />
+                    </template>
+                    <template x-if="!isVideo(file) && !isRaw(file)">
+                      <img :src="'/api/file/' + file"
+                           :style="paneStyle(pi)"
+                           @load="zoomFit($event, pi)" />
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
       </div>
     </template>
 
@@ -538,6 +812,23 @@
         trashEntries: [],
         trashSelecting: false,
         trashSelected: new Set(),
+        dupScanning: false,
+        dupThreshold: 10,
+        dupGroups: [],
+        dupIndex: 0,
+        dupMarked: new Set(),
+        dupCompare: new Set(),
+        dupComparing: false,
+        dupCompareFiles: [],
+        dupReturnHash: "",
+        panes: [],
+        panActive: false,
+        panStartX: 0,
+        panStartY: 0,
+        panOriginX: 0,
+        panOriginY: 0,
+        panActivePane: -1,
+        zoomSynced: true,
 
         get folders() {
           return this.entries.filter(e => e.isDir);
@@ -795,6 +1086,224 @@
               }
             }
           } catch {}
+        },
+
+        async findDuplicates() {
+          this.dupScanning = true;
+          try {
+            const res = await fetch("/api/duplicates?path=" + encodeURIComponent(this.currentPath) + "&threshold=" + this.dupThreshold);
+            if (res.ok) {
+              const groups = await res.json();
+              if (!groups || groups.length === 0) {
+                alert("No duplicates found in this folder.");
+                return;
+              }
+              this.dupGroups = groups;
+              this.dupIndex = 0;
+              this.dupMarked = new Set();
+              this.dupCompare = new Set();
+              this.dupComparing = false;
+              this.dupReturnHash = location.hash;
+              this.view = "duplicates";
+            }
+          } catch {}
+          this.dupScanning = false;
+        },
+
+        toggleDupCompare(file) {
+          if (this.dupCompare.has(file)) {
+            this.dupCompare.delete(file);
+          } else {
+            this.dupCompare.add(file);
+          }
+          this.dupCompare = new Set(this.dupCompare);
+        },
+
+        dupCompareOpen() {
+          this.dupCompareFiles = [...this.dupCompare];
+          this.panes = this.dupCompareFiles.map(() => ({
+            zoom: 1, fitZoom: 1, x: 0, y: 0,
+          }));
+          this.dupComparing = true;
+        },
+
+        paneStyle(pi) {
+          const p = this.panes[pi];
+          if (!p) return '';
+          return 'transform: translate(' + p.x + 'px, ' + p.y + 'px) scale(' + p.zoom + ')';
+        },
+
+        zoomFit(event, pi) {
+          const img = event.target;
+          const pane = img.closest('.pane-img');
+          if (!pane || !this.panes[pi]) return;
+          const pw = pane.clientWidth;
+          const ph = pane.clientHeight;
+          const fit = Math.min(pw / img.naturalWidth, ph / img.naturalHeight, 1);
+          const cx = (pw - img.naturalWidth * fit) / 2;
+          const cy = (ph - img.naturalHeight * fit) / 2;
+          if (this.zoomSynced) {
+            this.panes.forEach(p => { p.fitZoom = fit; p.zoom = fit; p.x = cx; p.y = cy; });
+          } else {
+            const p = this.panes[pi];
+            p.fitZoom = fit; p.zoom = fit; p.x = cx; p.y = cy;
+          }
+          this.panes = [...this.panes];
+        },
+
+        zoomReset() {
+          const els = document.querySelectorAll('.pane-img');
+          this.panes.forEach((p, i) => {
+            const el = els[i];
+            const img = el && el.querySelector('img');
+            if (el && img && img.naturalWidth) {
+              const fit = Math.min(el.clientWidth / img.naturalWidth, el.clientHeight / img.naturalHeight, 1);
+              p.fitZoom = fit; p.zoom = fit;
+              p.x = (el.clientWidth - img.naturalWidth * fit) / 2;
+              p.y = (el.clientHeight - img.naturalHeight * fit) / 2;
+            }
+          });
+          this.panes = [...this.panes];
+        },
+
+        zoomTo(level) {
+          const els = document.querySelectorAll('.pane-img');
+          this.panes.forEach((p, i) => {
+            const el = els[i];
+            if (el) {
+              const cx = el.clientWidth / 2;
+              const cy = el.clientHeight / 2;
+              const scale = level / p.zoom;
+              p.x = cx - scale * (cx - p.x);
+              p.y = cy - scale * (cy - p.y);
+            }
+            p.zoom = level;
+          });
+          this.panes = [...this.panes];
+        },
+
+        zoomWheel(event, pi) {
+          const delta = event.deltaY > 0 ? 0.9 : 1.1;
+          const p = this.panes[pi];
+          if (!p) return;
+          const newZoom = Math.max(0.05, Math.min(20, p.zoom * delta));
+          const rect = event.currentTarget.getBoundingClientRect();
+          const cx = event.clientX - rect.left;
+          const cy = event.clientY - rect.top;
+          const scale = newZoom / p.zoom;
+          const newX = cx - scale * (cx - p.x);
+          const newY = cy - scale * (cy - p.y);
+          if (this.zoomSynced) {
+            const dx = newX - p.x;
+            const dy = newY - p.y;
+            this.panes.forEach(pp => {
+              pp.x = (pp === p) ? newX : pp.x + dx;
+              pp.y = (pp === p) ? newY : pp.y + dy;
+              pp.zoom = newZoom;
+            });
+          } else {
+            p.zoom = newZoom; p.x = newX; p.y = newY;
+          }
+          this.panes = [...this.panes];
+        },
+
+        panStart(event, pi) {
+          this.panActive = true;
+          this.panActivePane = pi;
+          this.panStartX = event.clientX;
+          this.panStartY = event.clientY;
+          this.panOriginX = this.panes[pi].x;
+          this.panOriginY = this.panes[pi].y;
+        },
+
+        panMove(event, pi) {
+          if (!this.panActive) return;
+          const dx = event.clientX - this.panStartX;
+          const dy = event.clientY - this.panStartY;
+          const src = this.panActivePane;
+          if (this.zoomSynced) {
+            this.panes.forEach((p, i) => {
+              if (i === src) {
+                p.x = this.panOriginX + dx;
+                p.y = this.panOriginY + dy;
+              } else {
+                p.x += (event.movementX || 0);
+                p.y += (event.movementY || 0);
+              }
+            });
+          } else {
+            this.panes[src].x = this.panOriginX + dx;
+            this.panes[src].y = this.panOriginY + dy;
+          }
+          this.panes = [...this.panes];
+        },
+
+        panEnd() {
+          this.panActive = false;
+          this.panActivePane = -1;
+        },
+
+        get currentZoomPct() {
+          return this.panes.length > 0 ? Math.round(this.panes[0].zoom * 100) : 100;
+        },
+
+        toggleDupMark(file) {
+          if (this.dupMarked.has(file)) {
+            this.dupMarked.delete(file);
+          } else {
+            this.dupMarked.add(file);
+          }
+          this.dupMarked = new Set(this.dupMarked);
+        },
+
+        async dupTrash() {
+          if (this.dupMarked.size === 0) return;
+          const files = [...this.dupMarked];
+          try {
+            const res = await fetch("/api/trash", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ files }),
+            });
+            if (res.ok) {
+              // Remove trashed files from current group
+              const current = this.dupGroups[this.dupIndex];
+              current.files = current.files.filter(f => !this.dupMarked.has(f));
+              this.dupMarked = new Set();
+              this.dupCompare = new Set();
+              this.dupComparing = false;
+              // If group has <2 files left, remove it and advance
+              if (current.files.length < 2) {
+                this.dupGroups.splice(this.dupIndex, 1);
+                if (this.dupGroups.length === 0) {
+                  alert("All duplicate groups resolved!");
+                  this.dupBack();
+                  return;
+                }
+                if (this.dupIndex >= this.dupGroups.length) {
+                  this.dupIndex = this.dupGroups.length - 1;
+                }
+              }
+            }
+          } catch {}
+        },
+
+        dupSkip() {
+          this.dupMarked = new Set();
+          this.dupCompare = new Set();
+          this.dupComparing = false;
+          if (this.dupIndex < this.dupGroups.length - 1) {
+            this.dupIndex++;
+          }
+        },
+
+        dupBack() {
+          this.view = "browse";
+          if (this.dupReturnHash) {
+            location.hash = this.dupReturnHash;
+          } else {
+            this.browse(this.currentPath);
+          }
         },
 
         fileType(name) {
