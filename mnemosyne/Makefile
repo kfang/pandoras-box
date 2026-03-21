@@ -1,4 +1,4 @@
-IMAGE ?= ghcr.io/kfang/mnemosyne
+IMAGE ?= kjfang/mnemosyne
 TAG ?= latest
 
 .PHONY: dev build clean check deps docker docker-push
