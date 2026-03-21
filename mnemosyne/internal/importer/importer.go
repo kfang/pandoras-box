@@ -129,7 +129,7 @@ func (imp *Importer) processFile(path string) {
 		return
 	}
 
-	if err := os.Rename(path, destPath); err != nil {
+	if err := moveFile(path, destPath); err != nil {
 		imp.broadcast(Status{File: path, State: "error", Message: err.Error()})
 		return
 	}
@@ -142,6 +142,38 @@ func (imp *Importer) processFile(path string) {
 
 	imp.broadcast(Status{File: path, State: "done", Message: destPath})
 	log.Printf("imported %s -> %s", filepath.Base(path), destPath)
+}
+
+// moveFile tries os.Rename first, falling back to copy+delete for cross-device moves.
+func moveFile(src, dst string) error {
+	err := os.Rename(src, dst)
+	if err == nil {
+		return nil
+	}
+
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		os.Remove(dst)
+		return err
+	}
+
+	if err := out.Close(); err != nil {
+		os.Remove(dst)
+		return err
+	}
+
+	return os.Remove(src)
 }
 
 func filesEqual(pathA, pathB string) bool {

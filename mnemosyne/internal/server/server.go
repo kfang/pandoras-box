@@ -39,6 +39,9 @@ func New(addr, libraryDir string, imp *importer.Importer, scanFn ScanFunc) *Serv
 	mux.HandleFunc("/api/browse", s.handleBrowse)
 	mux.HandleFunc("/api/thumbnail/", s.handleThumbnail)
 	mux.HandleFunc("/api/scan", s.handleScan)
+	mux.HandleFunc("/api/trash", s.handleTrash)
+	mux.HandleFunc("/api/trash/empty", s.handleEmptyTrash)
+	mux.HandleFunc("/api/trash/restore", s.handleRestore)
 	mux.HandleFunc("/ws", s.handleWebSocket)
 	mux.Handle("/", http.FileServer(http.Dir("web")))
 
@@ -117,6 +120,118 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	}
 	go s.scanFn()
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Files []string `json:"files"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	trashDir := filepath.Join(s.libraryDir, ".trash")
+
+	var errors []string
+	for _, relPath := range req.Files {
+		srcPath := filepath.Join(s.libraryDir, filepath.Clean("/"+relPath))
+		if !strings.HasPrefix(srcPath, s.libraryDir) {
+			errors = append(errors, relPath+": forbidden")
+			continue
+		}
+
+		// Preserve folder structure in trash
+		destPath := filepath.Join(trashDir, filepath.Clean("/"+relPath))
+		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+			errors = append(errors, relPath+": "+err.Error())
+			continue
+		}
+
+		if err := os.Rename(srcPath, destPath); err != nil {
+			errors = append(errors, relPath+": "+err.Error())
+			continue
+		}
+	}
+
+	resp := struct {
+		Trashed int      `json:"trashed"`
+		Errors  []string `json:"errors,omitempty"`
+	}{
+		Trashed: len(req.Files) - len(errors),
+		Errors:  errors,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Files []string `json:"files"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	trashDir := filepath.Join(s.libraryDir, ".trash")
+
+	var errors []string
+	for _, relPath := range req.Files {
+		srcPath := filepath.Join(trashDir, filepath.Clean("/"+relPath))
+		if !strings.HasPrefix(srcPath, trashDir) {
+			errors = append(errors, relPath+": forbidden")
+			continue
+		}
+
+		destPath := filepath.Join(s.libraryDir, filepath.Clean("/"+relPath))
+		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+			errors = append(errors, relPath+": "+err.Error())
+			continue
+		}
+
+		if err := os.Rename(srcPath, destPath); err != nil {
+			errors = append(errors, relPath+": "+err.Error())
+			continue
+		}
+	}
+
+	resp := struct {
+		Restored int      `json:"restored"`
+		Errors   []string `json:"errors,omitempty"`
+	}{
+		Restored: len(req.Files) - len(errors),
+		Errors:   errors,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (s *Server) handleEmptyTrash(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	trashDir := filepath.Join(s.libraryDir, ".trash")
+	if err := os.RemoveAll(trashDir); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {

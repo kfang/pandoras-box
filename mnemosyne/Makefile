@@ -16,7 +16,7 @@ docker-push: docker
 	docker push $(IMAGE):$(TAG)
 
 deps:
-	@mkdir -p tmp/import tmp/library
+	@mkdir -p tmp/data/import tmp/data/library
 
 check:
 	go vet ./...

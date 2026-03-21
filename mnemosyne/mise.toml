@@ -3,7 +3,7 @@ go = "1.23"
 
 [env]
 CGO_ENABLED = "0"
-MNEMOSYNE_IMPORT_DIR = "./tmp/import"
-MNEMOSYNE_LIBRARY_DIR = "./tmp/library"
+MNEMOSYNE_IMPORT_DIR = "./tmp/data/import"
+MNEMOSYNE_LIBRARY_DIR = "./tmp/data/library"
 MNEMOSYNE_ADDR = ":8080"
 MNEMOSYNE_WORKERS = "4"

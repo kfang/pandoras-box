@@ -199,6 +199,66 @@
       text-align: center;
       padding: 2rem;
     }
+
+    .select-bar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      padding: 0.75rem 1rem;
+      background: #2d3748;
+      color: white;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+    }
+
+    .select-bar button {
+      padding: 0.375rem 0.75rem;
+      border: 1px solid rgba(255,255,255,0.3);
+      background: transparent;
+      color: white;
+      cursor: pointer;
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+    }
+
+    .select-bar button:hover { background: rgba(255,255,255,0.1); }
+
+    .select-bar .trash-btn {
+      background: #e53e3e;
+      border-color: #e53e3e;
+      margin-left: auto;
+    }
+
+    .select-bar .trash-btn:hover { background: #c53030; }
+
+    .image-card.selectable { cursor: pointer; }
+
+    .image-card.selected {
+      outline: 3px solid #4a90d9;
+      outline-offset: -3px;
+    }
+
+    .select-check {
+      position: absolute;
+      top: 0.375rem;
+      left: 0.375rem;
+      width: 1.25rem;
+      height: 1.25rem;
+      border-radius: 50%;
+      border: 2px solid white;
+      background: rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      color: white;
+    }
+
+    .image-card.selected .select-check {
+      background: #4a90d9;
+      border-color: #4a90d9;
+    }
   </style>
 </head>
 <body>
@@ -207,6 +267,7 @@
       <h1>Mnemosyne</h1>
       <nav class="tabs">
         <button :class="{ active: view === 'browse' }" @click="view = 'browse'">Library</button>
+        <button :class="{ active: view === 'trash' }" @click="view = 'trash'; browseTrash('')">Trash</button>
         <button :class="{ active: view === 'import' }" @click="view = 'import'">
           Import
           <template x-if="activeCount > 0">
@@ -231,6 +292,22 @@
           </template>
         </div>
 
+        <template x-if="selecting">
+          <div class="select-bar">
+            <span x-text="selected.size + ' selected'"></span>
+            <button @click="selectAll()">Select All</button>
+            <button @click="selectNone()">Select None</button>
+            <button @click="selecting = false; selected.clear()">Cancel</button>
+            <button class="trash-btn" @click="trashSelected()" :disabled="selected.size === 0">Trash</button>
+          </div>
+        </template>
+
+        <template x-if="!selecting && images.length > 0">
+          <div style="margin-bottom: 1rem;">
+            <button class="scan-btn" @click="selecting = true">Select</button>
+          </div>
+        </template>
+
         <div class="entries">
           <template x-if="currentPath">
             <button class="folder" @click="navigateUp()">..</button>
@@ -241,9 +318,71 @@
           </template>
 
           <template x-for="e in images" :key="currentPath + '/' + e.name">
-            <div class="image-card">
+            <div class="image-card" :class="{ selectable: selecting, selected: selected.has(filePath(e.name)) }" @click="selecting && toggleSelect(e.name)">
               <div class="thumb-wrap">
-                <img :src="'/api/thumbnail/' + (currentPath ? currentPath + '/' + e.name : e.name)" :alt="e.name" loading="lazy" />
+                <template x-if="selecting">
+                  <div class="select-check" x-text="selected.has(filePath(e.name)) ? '✓' : ''"></div>
+                </template>
+                <img :src="'/api/thumbnail/' + filePath(e.name)" :alt="e.name" loading="lazy" />
+                <span class="type-badge" :class="fileType(e.name).type" x-text="fileType(e.name).label"></span>
+              </div>
+              <div class="name" x-text="e.name"></div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+
+    <!-- Trash view -->
+    <template x-if="view === 'trash'">
+      <div>
+        <div class="breadcrumb">
+          <button @click="browseTrash('')">Trash</button>
+          <template x-for="seg in trashPathSegments()" :key="seg.path">
+            <span>
+              <span class="sep">/</span>
+              <button @click="browseTrash(seg.path)" x-text="seg.name"></button>
+            </span>
+          </template>
+        </div>
+
+        <template x-if="trashSelecting">
+          <div class="select-bar">
+            <span x-text="trashSelected.size + ' selected'"></span>
+            <button @click="trashSelectAll()">Select All</button>
+            <button @click="trashSelectNone()">Select None</button>
+            <button @click="trashSelecting = false; trashSelected.clear()">Cancel</button>
+            <button @click="restoreSelected()" :disabled="trashSelected.size === 0" style="margin-left: auto;">Restore</button>
+            <button class="trash-btn" @click="emptyTrash()">Empty Trash</button>
+          </div>
+        </template>
+
+        <template x-if="!trashSelecting && trashImages.length > 0">
+          <div style="margin-bottom: 1rem; display: flex; gap: 0.5rem;">
+            <button class="scan-btn" @click="trashSelecting = true">Select</button>
+          </div>
+        </template>
+
+        <template x-if="trashEntries.length === 0 && trashFolders.length === 0">
+          <p class="empty">Trash is empty.</p>
+        </template>
+
+        <div class="entries">
+          <template x-if="trashPath">
+            <button class="folder" @click="trashNavigateUp()">..</button>
+          </template>
+
+          <template x-for="e in trashFolders" :key="'trash/' + trashPath + '/' + e.name">
+            <button class="folder" @click="browseTrash(trashPath ? trashPath + '/' + e.name : e.name)" x-text="e.name"></button>
+          </template>
+
+          <template x-for="e in trashImages" :key="'trash/' + trashPath + '/' + e.name">
+            <div class="image-card" :class="{ selectable: trashSelecting, selected: trashSelected.has(trashFilePath(e.name)) }" @click="trashSelecting && toggleTrashSelect(e.name)">
+              <div class="thumb-wrap">
+                <template x-if="trashSelecting">
+                  <div class="select-check" x-text="trashSelected.has(trashFilePath(e.name)) ? '✓' : ''"></div>
+                </template>
+                <img :src="'/api/thumbnail/.trash/' + trashFilePath(e.name)" :alt="e.name" loading="lazy" />
                 <span class="type-badge" :class="fileType(e.name).type" x-text="fileType(e.name).label"></span>
               </div>
               <div class="name" x-text="e.name"></div>
@@ -302,15 +441,27 @@
         view: "browse",
         connected: false,
         scanning: false,
+        selecting: false,
+        selected: new Set(),
         currentPath: "",
         entries: [],
         statuses: [],
+        trashPath: "",
+        trashEntries: [],
+        trashSelecting: false,
+        trashSelected: new Set(),
 
         get folders() {
           return this.entries.filter(e => e.isDir);
         },
         get images() {
           return this.entries.filter(e => !e.isDir && isMedia(e.name));
+        },
+        get trashFolders() {
+          return this.trashEntries.filter(e => e.isDir);
+        },
+        get trashImages() {
+          return this.trashEntries.filter(e => !e.isDir && isMedia(e.name));
         },
         get activeCount() {
           return this.statuses.filter(s => s.state === "queued" || s.state === "processing").length;
@@ -324,6 +475,8 @@
         async browse(path) {
           this.currentPath = path;
           this.entries = [];
+          this.selected = new Set();
+          this.selecting = false;
           try {
             const res = await fetch("/api/browse?path=" + encodeURIComponent(path));
             if (res.ok) {
@@ -340,6 +493,129 @@
             await fetch("/api/scan", { method: "POST" });
           } catch {}
           this.scanning = false;
+        },
+
+        filePath(name) {
+          return this.currentPath ? this.currentPath + '/' + name : name;
+        },
+
+        toggleSelect(name) {
+          const path = this.filePath(name);
+          if (this.selected.has(path)) {
+            this.selected.delete(path);
+          } else {
+            this.selected.add(path);
+          }
+          // Trigger reactivity
+          this.selected = new Set(this.selected);
+        },
+
+        selectAll() {
+          this.images.forEach(e => this.selected.add(this.filePath(e.name)));
+          this.selected = new Set(this.selected);
+        },
+
+        selectNone() {
+          this.selected.clear();
+          this.selected = new Set(this.selected);
+        },
+
+        async browseTrash(path) {
+          this.trashPath = path;
+          this.trashEntries = [];
+          this.trashSelected = new Set();
+          this.trashSelecting = false;
+          try {
+            const res = await fetch("/api/browse?path=" + encodeURIComponent(".trash/" + path));
+            if (res.ok) {
+              this.trashEntries = await res.json() ?? [];
+            }
+          } catch {
+            this.trashEntries = [];
+          }
+        },
+
+        trashFilePath(name) {
+          return this.trashPath ? this.trashPath + '/' + name : name;
+        },
+
+        trashNavigateUp() {
+          const parts = this.trashPath.split("/").filter(Boolean);
+          parts.pop();
+          this.browseTrash(parts.join("/"));
+        },
+
+        trashPathSegments() {
+          const parts = this.trashPath.split("/").filter(Boolean);
+          return parts.map((name, i) => ({
+            name,
+            path: parts.slice(0, i + 1).join("/"),
+          }));
+        },
+
+        toggleTrashSelect(name) {
+          const path = this.trashFilePath(name);
+          if (this.trashSelected.has(path)) {
+            this.trashSelected.delete(path);
+          } else {
+            this.trashSelected.add(path);
+          }
+          this.trashSelected = new Set(this.trashSelected);
+        },
+
+        trashSelectAll() {
+          this.trashImages.forEach(e => this.trashSelected.add(this.trashFilePath(e.name)));
+          this.trashSelected = new Set(this.trashSelected);
+        },
+
+        trashSelectNone() {
+          this.trashSelected.clear();
+          this.trashSelected = new Set(this.trashSelected);
+        },
+
+        async restoreSelected() {
+          if (this.trashSelected.size === 0) return;
+          const files = [...this.trashSelected];
+          try {
+            const res = await fetch("/api/trash/restore", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ files }),
+            });
+            if (res.ok) {
+              this.trashSelected.clear();
+              this.trashSelecting = false;
+              this.browseTrash(this.trashPath);
+            }
+          } catch {}
+        },
+
+        async emptyTrash() {
+          if (!confirm("Permanently delete all trashed files?")) return;
+          try {
+            await fetch("/api/trash/empty", { method: "POST" });
+            this.browseTrash("");
+          } catch {}
+        },
+
+        async trashSelected() {
+          if (this.selected.size === 0) return;
+          const files = [...this.selected];
+          try {
+            const res = await fetch("/api/trash", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ files }),
+            });
+            if (res.ok) {
+              const result = await res.json();
+              if (result.trashed > 0) {
+                this.selected.clear();
+                this.selecting = false;
+                this.browse(this.currentPath);
+              }
+            }
+          } catch {}
         },
 
         fileType(name) {
