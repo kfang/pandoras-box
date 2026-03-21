@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/kfang/mnemosyne/internal/importer"
+	"github.com/kfang/mnemosyne/internal/metadata"
 	"github.com/kfang/mnemosyne/internal/thumbnail"
 )
 
@@ -38,6 +39,8 @@ func New(addr, libraryDir string, imp *importer.Importer, scanFn ScanFunc) *Serv
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/browse", s.handleBrowse)
 	mux.HandleFunc("/api/thumbnail/", s.handleThumbnail)
+	mux.HandleFunc("/api/file/", s.handleFile)
+	mux.HandleFunc("/api/preview/", s.handlePreview)
 	mux.HandleFunc("/api/scan", s.handleScan)
 	mux.HandleFunc("/api/trash", s.handleTrash)
 	mux.HandleFunc("/api/trash/empty", s.handleEmptyTrash)
@@ -111,6 +114,45 @@ func (s *Server) handleThumbnail(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	http.ServeFile(w, r, thumbPath)
+}
+
+func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
+	relPath := strings.TrimPrefix(r.URL.Path, "/api/file/")
+	filePath := filepath.Join(s.libraryDir, filepath.Clean("/"+relPath))
+
+	if !strings.HasPrefix(filePath, s.libraryDir) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	http.ServeFile(w, r, filePath)
+}
+
+func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
+	relPath := strings.TrimPrefix(r.URL.Path, "/api/preview/")
+	filePath := filepath.Join(s.libraryDir, filepath.Clean("/"+relPath))
+
+	if !strings.HasPrefix(filePath, s.libraryDir) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	previewDir := filepath.Join(s.libraryDir, ".previews")
+	previewPath := thumbnail.PreviewPath(filePath, previewDir)
+
+	if _, err := os.Stat(previewPath); err != nil {
+		if err := os.MkdirAll(previewDir, 0755); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err := metadata.ExtractPreview(filePath, previewPath); err != nil {
+			http.Error(w, "preview not available", http.StatusNotFound)
+			return
+		}
+	}
+
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	http.ServeFile(w, r, previewPath)
 }
 
 func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {

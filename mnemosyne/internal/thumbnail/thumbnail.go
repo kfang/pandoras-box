@@ -35,6 +35,12 @@ func ThumbPath(srcPath, thumbDir string) string {
 	return filepath.Join(thumbDir, hash[:16]+".jpg")
 }
 
+// PreviewPath returns the expected preview path for a given source file.
+func PreviewPath(srcPath, previewDir string) string {
+	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(srcPath)))
+	return filepath.Join(previewDir, hash[:16]+"_full.jpg")
+}
+
 // Generate creates a JPEG thumbnail for the given image file.
 func Generate(srcPath, thumbDir string) {
 	thumbPath := ThumbPath(srcPath, thumbDir)
