@@ -1,0 +1,269 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# whisper-srt — Generate Jellyfin-compatible SRT subtitles from video files using Whisper
+
+VERSION="1.0.0"
+MODEL="medium"
+LANGUAGE=""
+TRANSLATE=false
+RECURSIVE=false
+FORCE=false
+EXTENSIONS="mkv,mp4,avi,webm,ts"
+
+# Whisper language name → ISO 639-1 code
+declare -A LANG_MAP=(
+  [afrikaans]=af [arabic]=ar [armenian]=hy [azerbaijani]=az [belarusian]=be
+  [bosnian]=bs [bulgarian]=bg [catalan]=ca [chinese]=zh [croatian]=hr
+  [czech]=cs [danish]=da [dutch]=nl [english]=en [estonian]=et
+  [finnish]=fi [french]=fr [galician]=gl [german]=de [greek]=el
+  [hebrew]=he [hindi]=hi [hungarian]=hu [icelandic]=is [indonesian]=id
+  [italian]=it [japanese]=ja [kannada]=kn [kazakh]=kk [korean]=ko
+  [latvian]=lv [lithuanian]=lt [macedonian]=mk [malay]=ms [marathi]=mr
+  [maori]=mi [nepali]=ne [norwegian]=no [persian]=fa [polish]=pl
+  [portuguese]=pt [romanian]=ro [russian]=ru [serbian]=sr [slovak]=sk
+  [slovenian]=sl [spanish]=es [swahili]=sw [swedish]=sv [tagalog]=tl
+  [tamil]=ta [thai]=th [turkish]=tr [ukrainian]=uk [urdu]=ur
+  [vietnamese]=vi [welsh]=cy
+)
+
+usage() {
+  cat <<'EOF'
+Usage: whisper-srt [OPTIONS] <path>
+
+Generate Jellyfin-compatible SRT subtitles from video files using Whisper.
+
+Arguments:
+  path                Video file or directory to process
+
+Options:
+  -l, --language      Source language code (e.g., ja, en). Omit for auto-detect.
+  -t, --translate     Also generate English translation SRT
+  -m, --model         Whisper model: tiny|base|small|medium|large (default: medium)
+  -r, --recursive     Recurse into subdirectories
+  -f, --force         Overwrite existing SRT files (default: skip)
+  -e, --extensions    Video extensions to match (default: mkv,mp4,avi,webm,ts)
+  -h, --help          Show help
+  -v, --version       Show version
+
+Examples:
+  whisper-srt -l ja -t "Spirited Away.mkv"
+  whisper-srt -r -t /media/shows/
+EOF
+}
+
+die() { echo "error: $*" >&2; exit 1; }
+info() { echo ":: $*"; }
+warn() { echo "warning: $*" >&2; }
+
+# Parse arguments
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -l|--language)  LANGUAGE="$2"; shift 2 ;;
+    -t|--translate) TRANSLATE=true; shift ;;
+    -m|--model)     MODEL="$2"; shift 2 ;;
+    -r|--recursive) RECURSIVE=true; shift ;;
+    -f|--force)     FORCE=true; shift ;;
+    -e|--extensions) EXTENSIONS="$2"; shift 2 ;;
+    -h|--help)      usage; exit 0 ;;
+    -v|--version)   echo "whisper-srt $VERSION"; exit 0 ;;
+    --)             shift; POSITIONAL+=("$@"); break ;;
+    -*)             die "unknown option: $1" ;;
+    *)              POSITIONAL+=("$1"); shift ;;
+  esac
+done
+
+[[ ${#POSITIONAL[@]} -eq 1 ]] || { usage >&2; exit 1; }
+INPUT_PATH="${POSITIONAL[0]}"
+
+# Check dependencies
+command -v ffmpeg >/dev/null 2>&1 || die "ffmpeg not found on PATH"
+command -v whisper >/dev/null 2>&1 || die "whisper not found on PATH"
+
+# Resolve language name to ISO 639-1 code from Whisper's detected language output
+resolve_lang_code() {
+  local name="${1,,}" # lowercase
+  if [[ -n "${LANG_MAP[$name]+x}" ]]; then
+    echo "${LANG_MAP[$name]}"
+  else
+    # Already a code or unknown — pass through
+    echo "$name"
+  fi
+}
+
+# Process a single video file
+process_file() {
+  local video="$1"
+  local dir base lang_code
+
+  dir="$(dirname "$video")"
+  base="${video%.*}"
+
+  info "Processing: $video"
+
+  # Create temp directory, clean up on exit from this subshell
+  local tmpdir
+  tmpdir="$(mktemp -d)"
+  trap 'rm -rf "$tmpdir"' RETURN
+
+  # Determine expected output paths
+  local src_lang="$LANGUAGE"
+
+  # If we already know the language and files exist, we can skip early
+  if [[ -n "$src_lang" ]] && [[ "$FORCE" != true ]]; then
+    local transcribe_out="${base}.${src_lang}.srt"
+    local translate_out="${base}.en.srt"
+    local skip=true
+    [[ ! -f "$transcribe_out" ]] && skip=false
+    if [[ "$TRANSLATE" == true ]] && [[ "$src_lang" != "en" ]] && [[ ! -f "$translate_out" ]]; then
+      skip=false
+    fi
+    if [[ "$skip" == true ]]; then
+      info "Skipping (SRT already exists): $video"
+      return 0
+    fi
+  fi
+
+  # Extract audio
+  local audio="$tmpdir/audio.wav"
+  info "Extracting audio..."
+  if ! ffmpeg -i "$video" -vn -acodec pcm_s16le -ar 16000 -ac 1 "$audio" -y -loglevel warning 2>&1; then
+    warn "ffmpeg failed for: $video"
+    return 1
+  fi
+
+  # Build whisper args for transcription
+  local whisper_args=("$audio" --model "$MODEL" --output_format srt --output_dir "$tmpdir")
+  if [[ -n "$src_lang" ]]; then
+    whisper_args+=(--language "$src_lang")
+  fi
+
+  # Transcribe
+  info "Transcribing..."
+  local whisper_stderr="$tmpdir/whisper.log"
+  if ! whisper "${whisper_args[@]}" 2>"$whisper_stderr"; then
+    warn "Whisper transcription failed for: $video"
+    cat "$whisper_stderr" >&2
+    return 1
+  fi
+
+  # Detect language if not specified
+  if [[ -z "$src_lang" ]]; then
+    local detected
+    detected="$(grep -oP 'Detected language: \K\w+' "$whisper_stderr" || true)"
+    if [[ -n "$detected" ]]; then
+      src_lang="$(resolve_lang_code "$detected")"
+      info "Detected language: $detected ($src_lang)"
+    else
+      src_lang="und"
+      warn "Could not detect language, using 'und'"
+    fi
+  fi
+
+  # Move transcription SRT
+  local srt_src="$tmpdir/audio.srt"
+  local srt_dst="${base}.${src_lang}.srt"
+  if [[ -f "$srt_src" ]]; then
+    if [[ -f "$srt_dst" ]] && [[ "$FORCE" != true ]]; then
+      info "Skipping existing: $srt_dst"
+    else
+      mv "$srt_src" "$srt_dst"
+      info "Created: $srt_dst"
+    fi
+  else
+    warn "No SRT output from Whisper for: $video"
+    return 1
+  fi
+
+  # Translate if requested and source isn't English
+  if [[ "$TRANSLATE" == true ]] && [[ "$src_lang" != "en" ]]; then
+    local translate_dst="${base}.en.srt"
+    if [[ -f "$translate_dst" ]] && [[ "$FORCE" != true ]]; then
+      info "Skipping existing: $translate_dst"
+    else
+      info "Translating to English..."
+      local translate_args=("$audio" --model "$MODEL" --output_format srt --output_dir "$tmpdir" --task translate)
+      if [[ -n "$LANGUAGE" ]]; then
+        translate_args+=(--language "$LANGUAGE")
+      else
+        translate_args+=(--language "$src_lang")
+      fi
+
+      if ! whisper "${translate_args[@]}" 2>>"$whisper_stderr"; then
+        warn "Whisper translation failed for: $video"
+        return 1
+      fi
+
+      if [[ -f "$srt_src" ]]; then
+        mv "$srt_src" "$translate_dst"
+        info "Created: $translate_dst"
+      else
+        warn "No translation SRT output for: $video"
+      fi
+    fi
+  fi
+
+  info "Done: $video"
+}
+
+# Collect video files
+collect_files() {
+  local target="$1"
+  local -a ext_arr
+  IFS=',' read -ra ext_arr <<< "$EXTENSIONS"
+
+  if [[ -f "$target" ]]; then
+    echo "$target"
+    return
+  fi
+
+  if [[ ! -d "$target" ]]; then
+    die "not a file or directory: $target"
+  fi
+
+  local find_args=("$target")
+  if [[ "$RECURSIVE" != true ]]; then
+    find_args+=(-maxdepth 1)
+  fi
+  find_args+=(-type f \()
+  local first=true
+  for ext in "${ext_arr[@]}"; do
+    if [[ "$first" == true ]]; then
+      first=false
+    else
+      find_args+=(-o)
+    fi
+    find_args+=(-iname "*.${ext}")
+  done
+  find_args+=(\))
+  find_args+=(-print)
+
+  find "${find_args[@]}" | sort
+}
+
+# Main
+files=()
+while IFS= read -r f; do
+  files+=("$f")
+done < <(collect_files "$INPUT_PATH")
+
+if [[ ${#files[@]} -eq 0 ]]; then
+  die "no video files found in: $INPUT_PATH"
+fi
+
+info "Found ${#files[@]} video file(s)"
+
+errors=0
+for file in "${files[@]}"; do
+  if ! process_file "$file"; then
+    ((errors++)) || true
+  fi
+done
+
+if [[ $errors -gt 0 ]]; then
+  warn "$errors file(s) had errors"
+  exit 1
+fi
+
+info "All done!"
