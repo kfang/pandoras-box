@@ -1,17 +1,22 @@
 import type { Strategy, PipelineContext, TalkBoundary } from "../types";
 import { parseSrt, type SrtCue } from "../subtitles";
 
-interface CandidateBoundary {
+interface ScoredGap {
   gapStart: number;
   gapEnd: number;
-  gapDuration: number;
+  duration: number;
   score: number;
   reasons: string[];
 }
 
-/**
- * Score a gap based on its duration.
- */
+interface BoundaryCluster {
+  talkEnd: number;   // before first gap in cluster
+  talkStart: number; // after last gap in cluster
+  totalBreak: number;
+  maxScore: number;
+  reasons: string[];
+}
+
 function scoreGap(duration: number): { score: number; reason: string } {
   if (duration >= 90) return { score: 5, reason: `long gap (${Math.round(duration)}s)` };
   if (duration >= 30) return { score: 3, reason: `medium gap (${Math.round(duration)}s)` };
@@ -20,9 +25,6 @@ function scoreGap(duration: number): { score: number; reason: string } {
   return { score: 0, reason: "" };
 }
 
-/**
- * Check text around a gap for intro/outro patterns that signal talk boundaries.
- */
 function scoreTextPatterns(
   cues: SrtCue[],
   gapStartTime: number,
@@ -31,21 +33,18 @@ function scoreTextPatterns(
   let score = 0;
   const reasons: string[] = [];
 
-  // Get text before the gap (last ~60s)
   const beforeText = cues
     .filter((c) => c.startTime >= gapStartTime - 60 && c.startTime <= gapStartTime)
     .map((c) => c.text)
     .join(" ")
     .toLowerCase();
 
-  // Get text after the gap (first ~60s)
   const afterText = cues
     .filter((c) => c.startTime >= gapEndTime && c.startTime <= gapEndTime + 60)
     .map((c) => c.text)
     .join(" ")
     .toLowerCase();
 
-  // Outro patterns (before gap)
   if (/(?:please welcome|give it up|next speaker|next talk)/.test(beforeText)) {
     score += 3;
     reasons.push("intro/handoff before gap");
@@ -58,8 +57,6 @@ function scoreTextPatterns(
     score += 2;
     reasons.push("applause before gap");
   }
-
-  // Intro patterns (after gap)
   if (/(?:welcome everybody|welcome everyone|welcome back|welcome to)/.test(afterText)) {
     score += 2;
     reasons.push("welcome after gap");
@@ -80,18 +77,24 @@ function scoreTextPatterns(
   return { score, reasons };
 }
 
-/**
- * Find all gaps between consecutive cue start times >= minGap seconds.
- */
-function findGaps(cues: SrtCue[], minGap: number): { gapStart: number; gapEnd: number; duration: number }[] {
-  const gaps: { gapStart: number; gapEnd: number; duration: number }[] = [];
+function findGaps(cues: SrtCue[], minGap: number): ScoredGap[] {
+  const gaps: ScoredGap[] = [];
   for (let i = 1; i < cues.length; i++) {
-    const duration = cues[i].startTime - cues[i - 1].startTime;
+    const duration = cues[i].startTime - cues[i - 1].endTime;
     if (duration >= minGap) {
+      const gapScore = scoreGap(duration);
+      const textScore = scoreTextPatterns(cues, cues[i - 1].endTime, cues[i].startTime);
+      const totalScore = gapScore.score + textScore.score;
+      const reasons: string[] = [];
+      if (gapScore.reason) reasons.push(gapScore.reason);
+      reasons.push(...textScore.reasons);
+
       gaps.push({
-        gapStart: cues[i - 1].startTime,
+        gapStart: cues[i - 1].endTime,
         gapEnd: cues[i].startTime,
         duration,
+        score: totalScore,
+        reasons,
       });
     }
   }
@@ -99,31 +102,41 @@ function findGaps(cues: SrtCue[], minGap: number): { gapStart: number; gapEnd: n
 }
 
 /**
- * Deduplicate boundaries that are within `windowSec` of each other,
- * keeping the highest-scoring one.
+ * Cluster consecutive gaps where the next gap starts within `windowSec` of
+ * the previous gap's end. This correctly merges multi-phase transitions
+ * (e.g. end-of-talk gap + soundcheck gap + setup gap) into one boundary.
  */
-function dedup(boundaries: CandidateBoundary[], windowSec: number): CandidateBoundary[] {
-  if (boundaries.length === 0) return [];
+function clusterGaps(gaps: ScoredGap[], windowSec: number): BoundaryCluster[] {
+  if (gaps.length === 0) return [];
 
-  const sorted = [...boundaries].sort((a, b) => a.gapEnd - b.gapEnd);
-  const result: CandidateBoundary[] = [sorted[0]];
+  const clusters: BoundaryCluster[] = [];
+  let clusterGaps = [gaps[0]];
 
-  for (let i = 1; i < sorted.length; i++) {
-    const last = result[result.length - 1];
-    if (sorted[i].gapEnd - last.gapEnd < windowSec) {
-      // Keep the higher-scoring one
-      if (sorted[i].score > last.score) {
-        result[result.length - 1] = sorted[i];
-      }
+  for (let i = 1; i < gaps.length; i++) {
+    const last = clusterGaps[clusterGaps.length - 1];
+    if (gaps[i].gapStart - last.gapEnd < windowSec) {
+      clusterGaps.push(gaps[i]);
     } else {
-      result.push(sorted[i]);
+      clusters.push(makeCluster(clusterGaps));
+      clusterGaps = [gaps[i]];
     }
   }
-
-  return result;
+  clusters.push(makeCluster(clusterGaps));
+  return clusters;
 }
 
-/** Try to extract speaker name from cues near a talk start */
+function makeCluster(gaps: ScoredGap[]): BoundaryCluster {
+  const maxScore = Math.max(...gaps.map((g) => g.score));
+  const allReasons = [...new Set(gaps.flatMap((g) => g.reasons))];
+  return {
+    talkEnd: gaps[0].gapStart,
+    talkStart: gaps[gaps.length - 1].gapEnd,
+    totalBreak: gaps[gaps.length - 1].gapEnd - gaps[0].gapStart,
+    maxScore,
+    reasons: allReasons,
+  };
+}
+
 function extractSpeaker(cues: SrtCue[], startIdx: number): string {
   const window = cues
     .slice(startIdx, Math.min(cues.length, startIdx + 20))
@@ -148,7 +161,6 @@ function extractSpeaker(cues: SrtCue[], startIdx: number): string {
   return "Unknown";
 }
 
-/** Try to extract a topic/title from cues near a talk start */
 function extractTitle(cues: SrtCue[], startIdx: number, talkIndex: number): string {
   const window = cues
     .slice(startIdx, Math.min(cues.length, startIdx + 30))
@@ -179,14 +191,6 @@ function formatTime(seconds: number): string {
   return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
-/**
- * Combined gap + text pattern scoring for talk boundary detection.
- *
- * Works for both long-gap conferences (10+ min breaks) and short-gap
- * conferences (8-30s transitions). Gaps are scored by duration and
- * surrounding text is checked for intro/outro patterns. Boundaries
- * above a score threshold are kept.
- */
 export const transcriptHeuristicStrategy: Strategy = {
   name: "transcript",
 
@@ -209,40 +213,27 @@ export const transcriptHeuristicStrategy: Strategy = {
         `spanning ${formatTime(cues[0].startTime)} to ${formatTime(cues[cues.length - 1].endTime)}`
     );
 
-    // Find all gaps >= 8s between consecutive cue starts
-    const gaps = findGaps(cues, 8);
-    console.log(`Found ${gaps.length} gaps >= 8s`);
+    // Find all scored gaps >= 8s
+    const scoredGaps = findGaps(cues, 8);
+    console.log(`Found ${scoredGaps.length} gaps >= 8s`);
 
-    // Score each gap using duration + text patterns
-    const candidates: CandidateBoundary[] = [];
-    for (const gap of gaps) {
-      const gapScore = scoreGap(gap.duration);
-      const textScore = scoreTextPatterns(cues, gap.gapStart, gap.gapEnd);
+    // Only consider gaps that scored at least 1 (have some signal)
+    const candidateGaps = scoredGaps.filter((g) => g.score >= 1);
 
-      const totalScore = gapScore.score + textScore.score;
-      const reasons: string[] = [];
-      if (gapScore.reason) reasons.push(gapScore.reason);
-      reasons.push(...textScore.reasons);
+    // Cluster consecutive gaps where the next gap starts within 10 min of the
+    // previous gap's end. This merges multi-phase transitions into one boundary.
+    const CLUSTER_WINDOW = 10 * 60;
+    const clusters = clusterGaps(candidateGaps, CLUSTER_WINDOW);
+    console.log(`Clustered into ${clusters.length} boundary candidate(s)`);
 
-      if (totalScore >= 3) {
-        candidates.push({
-          gapStart: gap.gapStart,
-          gapEnd: gap.gapEnd,
-          gapDuration: gap.duration,
-          score: totalScore,
-          reasons,
-        });
-      }
-    }
-
-    // Deduplicate boundaries within 2 minutes of each other
-    const boundaries = dedup(candidates, 120);
+    // Keep clusters where at least one gap scored >= 3
+    const boundaries = clusters.filter((c) => c.maxScore >= 3);
 
     console.log(`\nFound ${boundaries.length} boundary candidate(s):`);
     for (const b of boundaries) {
       console.log(
-        `  ${formatTime(b.gapStart)} → ${formatTime(b.gapEnd)} ` +
-          `(score=${b.score}: ${b.reasons.join(", ")})`
+        `  ${formatTime(b.talkEnd)} → ${formatTime(b.talkStart)} ` +
+          `(break=${Math.round(b.totalBreak)}s, maxScore=${b.maxScore}: ${b.reasons.join(", ")})`
       );
     }
 
@@ -252,16 +243,15 @@ export const transcriptHeuristicStrategy: Strategy = {
       );
     }
 
-    // Build talk boundaries from detected gaps
+    // Build talk list from boundaries
     const talks: TalkBoundary[] = [];
     const streamStart = cues[0].startTime;
     const streamEnd = ctx.metadata.duration;
 
     for (let i = 0; i <= boundaries.length; i++) {
-      const talkStart = i === 0 ? streamStart : boundaries[i - 1].gapEnd;
-      const talkEnd = i === boundaries.length ? streamEnd : boundaries[i].gapStart;
+      const talkStart = i === 0 ? streamStart : boundaries[i - 1].talkStart;
+      const talkEnd = i === boundaries.length ? streamEnd : boundaries[i].talkEnd;
 
-      // Skip very short segments (< 60s) — likely noise
       if (talkEnd - talkStart < 60) continue;
 
       const startIdx = cues.findIndex((c) => c.startTime >= talkStart);
@@ -275,7 +265,7 @@ export const transcriptHeuristicStrategy: Strategy = {
       });
     }
 
-    console.log(`\nDetected ${talks.length} talks from combined gap + text analysis.`);
+    console.log(`\nDetected ${talks.length} talks from gap cluster analysis.`);
     for (const talk of talks) {
       console.log(
         `  ${formatTime(talk.startTime)} → ${formatTime(talk.endTime)} | ${talk.speaker} — ${talk.title}`
