@@ -1,0 +1,24 @@
+{
+  "name": "@kfang/ghstat-server",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "ghstat": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@kfang/ghstat-github-data": "workspace:*",
+    "@kfang/ghstat-persistence": "workspace:*",
+    "@kfang/ghstat-stats": "workspace:*",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "@types/bun": "^1.1.0",
+    "@types/js-yaml": "^4.0.9"
+  }
+}

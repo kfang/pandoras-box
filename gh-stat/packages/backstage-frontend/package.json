@@ -1,0 +1,29 @@
+{
+  "name": "@kfang/ghstat-backstage-frontend",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@kfang/ghstat-github-data": "workspace:*",
+    "@kfang/ghstat-stats": "workspace:*",
+    "@backstage/core-plugin-api": "^1.9.1",
+    "@backstage/core-components": "^0.14.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "@types/react": "^18.3.1",
+    "react": "^18.3.1",
+    "@types/react-router-dom": "^5.3.3",
+    "react-router-dom": "^6.23.1"
+  },
+  "peerDependencies": {
+    "@backstage/core-plugin-api": "^1.9.1",
+    "react": "^18.0.0"
+  }
+}

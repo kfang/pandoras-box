@@ -1,0 +1,128 @@
+<div
+  x-data="dashboard()"
+  x-init="init()"
+>
+  <h1>Repository Dashboard</h1>
+
+  <!-- Org filter -->
+  <div class="card" style="display:flex;gap:12px;align-items:center;padding:12px 16px;">
+    <label style="font-size:14px;font-weight:600;">Org filter:</label>
+    <input
+      type="text"
+      x-model="orgFilter"
+      @input.debounce.300ms="loadRepos()"
+      placeholder="e.g. my-org"
+      style="border:1px solid #d0d7de;border-radius:6px;padding:6px 10px;font-size:14px;width:200px;"
+    />
+    <span style="font-size:13px;color:#656d76;" x-text="repos.length + ' repos'"></span>
+  </div>
+
+  <!-- Stats row -->
+  <div class="grid" style="margin-bottom:16px;" x-show="orgStats">
+    <div class="card stat">
+      <div class="value" x-text="orgStats?.totalRepos ?? '—'"></div>
+      <div class="label">Total repos</div>
+    </div>
+    <div class="card stat">
+      <div class="value" x-text="orgStats?.totalMergedPRs ?? '—'"></div>
+      <div class="label">Merged PRs</div>
+    </div>
+    <div class="card stat">
+      <div class="value" x-text="orgStats?.uniqueContributors ?? '—'"></div>
+      <div class="label">Contributors</div>
+    </div>
+    <div class="card stat">
+      <div class="value" x-text="orgStats?.totalOpenIssues ?? '—'"></div>
+      <div class="label">Open issues</div>
+    </div>
+  </div>
+
+  <!-- Repo table -->
+  <div class="card" style="padding:0;overflow:hidden;">
+    <table>
+      <thead>
+        <tr>
+          <th>Repository</th>
+          <th>Language</th>
+          <th>Stars</th>
+          <th>Open issues</th>
+          <th>Last push</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="repo in repos" :key="repo.full_name">
+          <tr>
+            <td>
+              <a :href="'/repo/' + repo.full_name" x-text="repo.full_name"></a>
+            </td>
+            <td>
+              <span
+                class="badge badge-gray"
+                x-show="repo.language"
+                x-text="repo.language"
+              ></span>
+              <span x-show="!repo.language" style="color:#656d76;">—</span>
+            </td>
+            <td x-text="repo.stargazers_count.toLocaleString()"></td>
+            <td x-text="repo.open_issues_count.toLocaleString()"></td>
+            <td x-text="formatDate(repo.pushed_at)"></td>
+            <td>
+              <span
+                :class="repo.archived ? 'badge badge-gray' : staleDays(repo.pushed_at) >= 90 ? 'badge badge-yellow' : 'badge badge-green'"
+                x-text="repo.archived ? 'Archived' : staleDays(repo.pushed_at) >= 90 ? 'Stale' : 'Active'"
+              ></span>
+            </td>
+          </tr>
+        </template>
+        <tr x-show="repos.length === 0 && !loading">
+          <td colspan="6" style="text-align:center;color:#656d76;padding:24px;">No repos found.</td>
+        </tr>
+        <tr x-show="loading">
+          <td colspan="6" style="text-align:center;color:#656d76;padding:24px;">Loading…</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+function dashboard() {
+  return {
+    repos: [],
+    orgStats: null,
+    orgFilter: '',
+    loading: false,
+
+    async init() {
+      await this.loadRepos();
+    },
+
+    async loadRepos() {
+      this.loading = true;
+      const url = this.orgFilter
+        ? `/api/repos?org=${encodeURIComponent(this.orgFilter)}`
+        : '/api/repos';
+      const res = await fetch(url);
+      this.repos = await res.json();
+
+      if (this.orgFilter) {
+        const statsRes = await fetch(`/api/stats/org/${encodeURIComponent(this.orgFilter)}`);
+        if (statsRes.ok) this.orgStats = await statsRes.json();
+      } else {
+        this.orgStats = null;
+      }
+      this.loading = false;
+    },
+
+    formatDate(iso) {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleDateString();
+    },
+
+    staleDays(pushedAt) {
+      return Math.floor((Date.now() - new Date(pushedAt).getTime()) / (86400 * 1000));
+    },
+  };
+}
+</script>

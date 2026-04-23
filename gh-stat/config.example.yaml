@@ -1,0 +1,19 @@
+github:
+  token: ${GITHUB_TOKEN}
+  orgs:
+    - my-org
+  repos:
+    - owner/repo
+
+persistence:
+  type: sqlite        # sqlite | backstage
+  sqlite:
+    path: ./data/gh-stat.db
+
+refresh:
+  interval: 3600      # seconds between full syncs
+  on_start: true      # sync when server starts
+
+server:
+  port: 3000
+  host: 0.0.0.0

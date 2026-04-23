@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{title}} — gh-stat</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f6f8fa; color: #1f2328; }
+    nav { background: #24292f; color: #fff; padding: 12px 24px; display: flex; align-items: center; gap: 16px; }
+    nav a { color: #cdd9e5; text-decoration: none; font-size: 14px; }
+    nav a:hover { color: #fff; }
+    nav .brand { font-weight: 700; font-size: 16px; color: #fff; }
+    main { max-width: 1200px; margin: 24px auto; padding: 0 24px; }
+    h1 { font-size: 24px; font-weight: 700; margin-bottom: 16px; }
+    h2 { font-size: 18px; font-weight: 600; margin-bottom: 12px; }
+    .card { background: #fff; border: 1px solid #d0d7de; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+    .stat { text-align: center; }
+    .stat .value { font-size: 32px; font-weight: 700; }
+    .stat .label { font-size: 13px; color: #656d76; margin-top: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; padding: 8px 12px; background: #f6f8fa; border-bottom: 1px solid #d0d7de; font-weight: 600; }
+    td { padding: 8px 12px; border-bottom: 1px solid #eaeef2; }
+    tr:hover td { background: #f6f8fa; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+    .badge-green { background: #dafbe1; color: #1a7f37; }
+    .badge-red { background: #ffd7d3; color: #82071e; }
+    .badge-yellow { background: #fff8c5; color: #9a6700; }
+    .badge-gray { background: #eaeef2; color: #656d76; }
+    a { color: #0969da; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    [x-cloak] { display: none !important; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/" class="brand">gh-stat</a>
+    <a href="/">Repos</a>
+  </nav>
+  <main>
+    {{content}}
+  </main>
+</body>
+</html>

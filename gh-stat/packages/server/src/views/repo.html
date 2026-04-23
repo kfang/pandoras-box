@@ -1,0 +1,124 @@
+<div
+  x-data="repoPage()"
+  x-init="init()"
+>
+  <div style="margin-bottom:8px;">
+    <a href="/">&larr; All repos</a>
+  </div>
+  <h1 x-text="fullName"></h1>
+
+  <template x-if="stats">
+    <div>
+      <!-- Health row -->
+      <div class="grid" style="margin-bottom:16px;">
+        <div class="card stat">
+          <div class="value" x-text="stats.velocity.mergedPRs"></div>
+          <div class="label">Merged PRs</div>
+        </div>
+        <div class="card stat">
+          <div class="value" x-text="stats.velocity.openPRs"></div>
+          <div class="label">Open PRs</div>
+        </div>
+        <div class="card stat">
+          <div class="value" x-text="stats.velocity.avgTimeToMergeLabel ?? '—'"></div>
+          <div class="label">Avg time to merge</div>
+        </div>
+        <div class="card stat">
+          <div class="value" x-text="stats.health.daysSinceLastPush + 'd'"></div>
+          <div class="label">Days since push</div>
+        </div>
+        <div class="card stat">
+          <div class="value" x-text="stats.health.busFactor"></div>
+          <div class="label">Bus factor</div>
+        </div>
+        <div class="card stat">
+          <div class="value" x-text="stats.contributors.uniqueContributors"></div>
+          <div class="label">Contributors</div>
+        </div>
+      </div>
+
+      <!-- PR Velocity details -->
+      <div class="card">
+        <h2>PR Velocity</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Total PRs</td><td x-text="stats.velocity.totalPRs"></td></tr>
+            <tr><td>Merge rate</td><td x-text="(stats.velocity.mergeRate * 100).toFixed(1) + '%'"></td></tr>
+            <tr><td>p50 cycle time</td><td x-text="formatMs(stats.velocity.p50CycleTimeMs)"></td></tr>
+            <tr><td>p90 cycle time</td><td x-text="formatMs(stats.velocity.p90CycleTimeMs)"></td></tr>
+            <tr><td>Weekly throughput</td><td x-text="stats.velocity.weeklyThroughput ? stats.velocity.weeklyThroughput.toFixed(1) + ' PRs/wk' : '—'"></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Contributors -->
+      <div class="card">
+        <h2>Contributors</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Merged</th>
+              <th>Open</th>
+              <th>Merge rate</th>
+              <th>Additions</th>
+              <th>Deletions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="c in stats.contributors.contributors" :key="c.login">
+              <tr>
+                <td x-text="c.login"></td>
+                <td x-text="c.mergedPRs"></td>
+                <td x-text="c.openPRs"></td>
+                <td x-text="(c.mergeRate * 100).toFixed(0) + '%'"></td>
+                <td x-text="'+' + c.totalAdditions.toLocaleString()"></td>
+                <td x-text="'-' + c.totalDeletions.toLocaleString()"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </template>
+
+  <div x-show="loading" style="color:#656d76;padding:24px;">Loading…</div>
+  <div x-show="error" x-text="error" style="color:#cf222e;padding:24px;"></div>
+</div>
+
+<script>
+function repoPage() {
+  return {
+    fullName: location.pathname.replace('/repo/', ''),
+    stats: null,
+    loading: false,
+    error: null,
+
+    async init() {
+      this.loading = true;
+      const res = await fetch(`/api/stats/${this.fullName}`);
+      if (!res.ok) {
+        this.error = 'Failed to load stats for ' + this.fullName;
+      } else {
+        this.stats = await res.json();
+      }
+      this.loading = false;
+    },
+
+    formatMs(ms) {
+      if (ms === null || ms === undefined) return '—';
+      const hours = ms / (1000 * 60 * 60);
+      if (hours < 24) return hours.toFixed(1) + 'h';
+      const days = hours / 24;
+      if (days < 7) return days.toFixed(1) + 'd';
+      return (days / 7).toFixed(1) + 'w';
+    },
+  };
+}
+</script>
