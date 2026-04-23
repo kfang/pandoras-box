@@ -5,7 +5,7 @@ import {
 import type { Request, Response, NextFunction } from "express";
 import { Router } from "express";
 import { createGitHubClient } from "@kfang/ghstat-github-data";
-import { BackstageStorageProvider } from "@kfang/ghstat-persistence";
+import { BackstageStorageProvider, syncAll } from "@kfang/ghstat-persistence";
 import type { BackstageDatabaseService } from "@kfang/ghstat-persistence";
 import {
   calcPRVelocity,
@@ -37,8 +37,7 @@ export const ghStatPlugin = createBackendPlugin({
           database as unknown as BackstageDatabaseService,
         );
 
-        const { syncAll } = await import("./sync.js");
-        const syncConfig = { github: { token, orgs, repos } };
+        const syncConfig = { github: { orgs, repos } };
 
         // Schedule periodic sync
         await scheduler.scheduleTask({
@@ -46,9 +45,7 @@ export const ghStatPlugin = createBackendPlugin({
           frequency: { seconds: intervalSeconds },
           timeout: { minutes: 30 },
           async fn() {
-            logger.info("gh-stat: starting sync");
-            await syncAll(client, storage, syncConfig);
-            logger.info("gh-stat: sync complete");
+            await syncAll(client, storage, syncConfig, logger);
           },
         });
 
