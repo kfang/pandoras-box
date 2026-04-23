@@ -1,5 +1,81 @@
 import { Database } from "bun:sqlite";
 import type { StorageProvider, GhRepo, GhPullRequest, GhPRComment } from "./types.js";
+import { runMigrationsSync, type Migration } from "./migrations.js";
+
+const MIGRATIONS: ReadonlyArray<Migration> = [
+  {
+    version: 1,
+    table: "repos",
+    sql: `CREATE TABLE repos (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      full_name TEXT NOT NULL UNIQUE,
+      owner TEXT NOT NULL,
+      private INTEGER NOT NULL,
+      description TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      pushed_at TEXT NOT NULL,
+      stargazers_count INTEGER NOT NULL,
+      forks_count INTEGER NOT NULL,
+      open_issues_count INTEGER NOT NULL,
+      language TEXT,
+      topics TEXT NOT NULL DEFAULT '[]',
+      size INTEGER NOT NULL,
+      watchers_count INTEGER NOT NULL,
+      default_branch TEXT NOT NULL,
+      archived INTEGER NOT NULL
+    )`,
+  },
+  {
+    version: 2,
+    table: "pull_requests",
+    sql: `CREATE TABLE pull_requests (
+      id INTEGER PRIMARY KEY,
+      repo_full_name TEXT NOT NULL,
+      number INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      state TEXT NOT NULL,
+      user_login TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      merged_at TEXT,
+      closed_at TEXT,
+      additions INTEGER NOT NULL,
+      deletions INTEGER NOT NULL,
+      changed_files INTEGER NOT NULL,
+      comments INTEGER NOT NULL,
+      review_comments INTEGER NOT NULL,
+      commits INTEGER NOT NULL,
+      draft INTEGER NOT NULL,
+      labels TEXT NOT NULL DEFAULT '[]',
+      UNIQUE (repo_full_name, number)
+    )`,
+  },
+  {
+    version: 3,
+    table: "sync_state",
+    sql: `CREATE TABLE sync_state (
+      repo_full_name TEXT PRIMARY KEY,
+      last_sync_time TEXT NOT NULL
+    )`,
+  },
+  {
+    version: 4,
+    table: "pr_comments",
+    sql: `CREATE TABLE pr_comments (
+      id INTEGER NOT NULL,
+      comment_type TEXT NOT NULL,
+      repo_full_name TEXT NOT NULL,
+      pr_number INTEGER NOT NULL,
+      body TEXT NOT NULL,
+      user_login TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (id, comment_type)
+    )`,
+  },
+];
 
 export class SqliteStorageProvider implements StorageProvider {
   private db: Database;
@@ -11,67 +87,37 @@ export class SqliteStorageProvider implements StorageProvider {
   }
 
   private migrate(): void {
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS repos (
-        id INTEGER PRIMARY KEY,
-        name TEXT NOT NULL,
-        full_name TEXT NOT NULL UNIQUE,
-        owner TEXT NOT NULL,
-        private INTEGER NOT NULL,
-        description TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        pushed_at TEXT NOT NULL,
-        stargazers_count INTEGER NOT NULL,
-        forks_count INTEGER NOT NULL,
-        open_issues_count INTEGER NOT NULL,
-        language TEXT,
-        topics TEXT NOT NULL DEFAULT '[]',
-        size INTEGER NOT NULL,
-        watchers_count INTEGER NOT NULL,
-        default_branch TEXT NOT NULL,
-        archived INTEGER NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS pull_requests (
-        id INTEGER PRIMARY KEY,
-        repo_full_name TEXT NOT NULL,
-        number INTEGER NOT NULL,
-        title TEXT NOT NULL,
-        state TEXT NOT NULL,
-        user_login TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        merged_at TEXT,
-        closed_at TEXT,
-        additions INTEGER NOT NULL,
-        deletions INTEGER NOT NULL,
-        changed_files INTEGER NOT NULL,
-        comments INTEGER NOT NULL,
-        review_comments INTEGER NOT NULL,
-        commits INTEGER NOT NULL,
-        draft INTEGER NOT NULL,
-        labels TEXT NOT NULL DEFAULT '[]',
-        UNIQUE (repo_full_name, number)
-      );
-
-      CREATE TABLE IF NOT EXISTS sync_state (
-        repo_full_name TEXT PRIMARY KEY,
-        last_sync_time TEXT NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS pr_comments (
-        id INTEGER NOT NULL,
-        comment_type TEXT NOT NULL,
-        repo_full_name TEXT NOT NULL,
-        pr_number INTEGER NOT NULL,
-        body TEXT NOT NULL,
-        user_login TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        PRIMARY KEY (id, comment_type)
-      );
-    `);
+    const db = this.db;
+    runMigrationsSync(
+      {
+        createTrackingTable: () => {
+          db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY)`);
+        },
+        tableExists: (name) =>
+          !!(db
+            .prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = $n`)
+            .get({ $n: name })),
+        getAppliedVersions: () =>
+          new Set(
+            (db.prepare(`SELECT version FROM schema_migrations`).all() as { version: number }[]).map(
+              (r) => r.version,
+            ),
+          ),
+        applyMigration: (version, sql) => {
+          const run = db.transaction(() => {
+            db.exec(sql);
+            db.prepare(`INSERT INTO schema_migrations (version) VALUES ($v)`).run({ $v: version });
+          });
+          run();
+        },
+        recordVersion: (version) => {
+          db.prepare(`INSERT OR IGNORE INTO schema_migrations (version) VALUES ($v)`).run({
+            $v: version,
+          });
+        },
+      },
+      MIGRATIONS,
+    );
   }
 
   async saveRepo(repo: GhRepo): Promise<void> {

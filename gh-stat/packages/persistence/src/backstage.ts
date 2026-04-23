@@ -1,4 +1,5 @@
 import type { StorageProvider, GhRepo, GhPullRequest, GhPRComment } from "./types.js";
+import { runMigrations, type Migration } from "./migrations.js";
 
 /**
  * Backstage DatabaseService interface (subset used here).
@@ -12,7 +13,9 @@ export interface BackstageKnexClient {
   schema: {
     hasTable(table: string): Promise<boolean>;
     createTable(table: string, cb: (t: TableBuilder) => void): Promise<void>;
+    alterTable(table: string, cb: (t: TableBuilder) => void): Promise<void>;
   };
+  raw(sql: string): Promise<void>;
   (table: string): QueryBuilder;
 }
 
@@ -51,6 +54,81 @@ interface OnConflictBuilder {
   ignore(): Promise<unknown>;
 }
 
+const MIGRATIONS: ReadonlyArray<Migration> = [
+  {
+    version: 1,
+    table: "ghstat_repos",
+    sql: `CREATE TABLE ghstat_repos (
+      id INTEGER NOT NULL PRIMARY KEY,
+      name TEXT NOT NULL,
+      full_name TEXT NOT NULL UNIQUE,
+      owner TEXT NOT NULL,
+      private BOOLEAN NOT NULL,
+      description TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      pushed_at TEXT NOT NULL,
+      stargazers_count INTEGER NOT NULL,
+      forks_count INTEGER NOT NULL,
+      open_issues_count INTEGER NOT NULL,
+      language TEXT,
+      topics TEXT NOT NULL DEFAULT '[]',
+      size INTEGER NOT NULL,
+      watchers_count INTEGER NOT NULL,
+      default_branch TEXT NOT NULL,
+      archived BOOLEAN NOT NULL
+    )`,
+  },
+  {
+    version: 2,
+    table: "ghstat_pull_requests",
+    sql: `CREATE TABLE ghstat_pull_requests (
+      id INTEGER NOT NULL,
+      repo_full_name TEXT NOT NULL,
+      number INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      state TEXT NOT NULL,
+      user_login TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      merged_at TEXT,
+      closed_at TEXT,
+      additions INTEGER NOT NULL,
+      deletions INTEGER NOT NULL,
+      changed_files INTEGER NOT NULL,
+      comments INTEGER NOT NULL,
+      review_comments INTEGER NOT NULL,
+      commits INTEGER NOT NULL,
+      draft BOOLEAN NOT NULL,
+      labels TEXT NOT NULL DEFAULT '[]',
+      PRIMARY KEY (repo_full_name, number)
+    )`,
+  },
+  {
+    version: 3,
+    table: "ghstat_sync_state",
+    sql: `CREATE TABLE ghstat_sync_state (
+      repo_full_name TEXT NOT NULL PRIMARY KEY,
+      last_sync_time TEXT NOT NULL
+    )`,
+  },
+  {
+    version: 4,
+    table: "ghstat_pr_comments",
+    sql: `CREATE TABLE ghstat_pr_comments (
+      id INTEGER NOT NULL,
+      comment_type TEXT NOT NULL,
+      repo_full_name TEXT NOT NULL,
+      pr_number INTEGER NOT NULL,
+      body TEXT NOT NULL,
+      user_login TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (id, comment_type)
+    )`,
+  },
+];
+
 export class BackstageStorageProvider implements StorageProvider {
   private dbPromise: Promise<BackstageKnexClient>;
 
@@ -65,73 +143,32 @@ export class BackstageStorageProvider implements StorageProvider {
   }
 
   private async migrate(db: BackstageKnexClient): Promise<void> {
-    if (!(await db.schema.hasTable("ghstat_repos"))) {
-      await db.schema.createTable("ghstat_repos", (t) => {
-        t.integer("id").notNullable().primary();
-        t.string("name").notNullable();
-        t.string("full_name").notNullable().unique();
-        t.string("owner").notNullable();
-        t.boolean("private").notNullable();
-        t.text("description").nullable();
-        t.string("created_at").notNullable();
-        t.string("updated_at").notNullable();
-        t.string("pushed_at").notNullable();
-        t.integer("stargazers_count").notNullable();
-        t.integer("forks_count").notNullable();
-        t.integer("open_issues_count").notNullable();
-        t.string("language").nullable();
-        t.text("topics").notNullable().defaultTo("[]");
-        t.integer("size").notNullable();
-        t.integer("watchers_count").notNullable();
-        t.string("default_branch").notNullable();
-        t.boolean("archived").notNullable();
-      });
-    }
-
-    if (!(await db.schema.hasTable("ghstat_pull_requests"))) {
-      await db.schema.createTable("ghstat_pull_requests", (t) => {
-        t.integer("id").notNullable();
-        t.string("repo_full_name").notNullable();
-        t.integer("number").notNullable();
-        t.text("title").notNullable();
-        t.string("state").notNullable();
-        t.string("user_login").notNullable();
-        t.string("created_at").notNullable();
-        t.string("updated_at").notNullable();
-        t.string("merged_at").nullable();
-        t.string("closed_at").nullable();
-        t.integer("additions").notNullable();
-        t.integer("deletions").notNullable();
-        t.integer("changed_files").notNullable();
-        t.integer("comments").notNullable();
-        t.integer("review_comments").notNullable();
-        t.integer("commits").notNullable();
-        t.boolean("draft").notNullable();
-        t.text("labels").notNullable().defaultTo("[]");
-        t.primary(["repo_full_name", "number"]);
-      });
-    }
-
-    if (!(await db.schema.hasTable("ghstat_sync_state"))) {
-      await db.schema.createTable("ghstat_sync_state", (t) => {
-        t.string("repo_full_name").notNullable().primary();
-        t.string("last_sync_time").notNullable();
-      });
-    }
-
-    if (!(await db.schema.hasTable("ghstat_pr_comments"))) {
-      await db.schema.createTable("ghstat_pr_comments", (t) => {
-        t.integer("id").notNullable();
-        t.string("comment_type").notNullable();
-        t.string("repo_full_name").notNullable();
-        t.integer("pr_number").notNullable();
-        t.text("body").notNullable();
-        t.string("user_login").notNullable();
-        t.string("created_at").notNullable();
-        t.string("updated_at").notNullable();
-        t.primary(["id", "comment_type"]);
-      });
-    }
+    await runMigrations(
+      {
+        createTrackingTable: async () => {
+          if (!(await db.schema.hasTable("ghstat_migrations"))) {
+            await db.schema.createTable("ghstat_migrations", (t) => {
+              t.integer("version").notNullable().primary();
+            });
+          }
+        },
+        tableExists: (name) => db.schema.hasTable(name),
+        getAppliedVersions: async () => {
+          const rows = (await db("ghstat_migrations").select("version")) as unknown as {
+            version: number;
+          }[];
+          return new Set(rows.map((r) => r.version));
+        },
+        applyMigration: async (version, sql) => {
+          await db.raw(sql);
+          await db("ghstat_migrations").insert({ version });
+        },
+        recordVersion: async (version) => {
+          await db("ghstat_migrations").insert({ version }).onConflict("version").ignore();
+        },
+      },
+      MIGRATIONS,
+    );
   }
 
   async saveRepo(repo: GhRepo): Promise<void> {
