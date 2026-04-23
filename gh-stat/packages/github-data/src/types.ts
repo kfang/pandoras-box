@@ -44,3 +44,14 @@ export interface FetchPullRequestsOptions {
   since?: Date;
   perPage?: number;
 }
+
+export interface GhPRComment {
+  id: number;
+  pr_number: number;
+  body: string;
+  user_login: string;
+  created_at: string;
+  updated_at: string;
+  /** "issue_comment" = top-level PR thread comment; "review_comment" = inline code comment */
+  comment_type: "issue_comment" | "review_comment";
+}

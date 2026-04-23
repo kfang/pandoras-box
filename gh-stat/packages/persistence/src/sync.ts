@@ -1,5 +1,5 @@
 import type { GitHubClient } from "@kfang/ghstat-github-data";
-import { fetchRepo, fetchOrgRepos, fetchPullRequests } from "@kfang/ghstat-github-data";
+import { fetchRepo, fetchOrgRepos, fetchPullRequests, fetchPRComments } from "@kfang/ghstat-github-data";
 import type { StorageProvider } from "./types.js";
 
 export interface SyncConfig {
@@ -73,6 +73,14 @@ export async function syncAll(
         since: lastSync ?? undefined,
       })) {
         await storage.savePullRequest(pr, fullName);
+
+        try {
+          for await (const comment of fetchPRComments(client, owner, repo, pr.number)) {
+            await storage.saveComment(comment, fullName);
+          }
+        } catch (err) {
+          logger.error(`Failed to sync comments for ${fullName}#${pr.number}`, err);
+        }
       }
       await storage.setLastSyncTime(fullName, new Date());
     } catch (err) {

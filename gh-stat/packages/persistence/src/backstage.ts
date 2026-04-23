@@ -1,4 +1,4 @@
-import type { StorageProvider, GhRepo, GhPullRequest } from "./types.js";
+import type { StorageProvider, GhRepo, GhPullRequest, GhPRComment } from "./types.js";
 
 /**
  * Backstage DatabaseService interface (subset used here).
@@ -118,6 +118,20 @@ export class BackstageStorageProvider implements StorageProvider {
         t.string("last_sync_time").notNullable();
       });
     }
+
+    if (!(await db.schema.hasTable("ghstat_pr_comments"))) {
+      await db.schema.createTable("ghstat_pr_comments", (t) => {
+        t.integer("id").notNullable();
+        t.string("comment_type").notNullable();
+        t.string("repo_full_name").notNullable();
+        t.integer("pr_number").notNullable();
+        t.text("body").notNullable();
+        t.string("user_login").notNullable();
+        t.string("created_at").notNullable();
+        t.string("updated_at").notNullable();
+        t.primary(["id", "comment_type"]);
+      });
+    }
   }
 
   async saveRepo(repo: GhRepo): Promise<void> {
@@ -171,6 +185,23 @@ export class BackstageStorageProvider implements StorageProvider {
         labels: JSON.stringify(pr.labels),
       })
       .onConflict(["repo_full_name", "number"])
+      .merge();
+  }
+
+  async saveComment(comment: GhPRComment, repoFullName: string): Promise<void> {
+    const db = await this.dbPromise;
+    await db("ghstat_pr_comments")
+      .insert({
+        id: comment.id,
+        comment_type: comment.comment_type,
+        repo_full_name: repoFullName,
+        pr_number: comment.pr_number,
+        body: comment.body,
+        user_login: comment.user_login,
+        created_at: comment.created_at,
+        updated_at: comment.updated_at,
+      })
+      .onConflict(["id", "comment_type"])
       .merge();
   }
 

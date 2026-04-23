@@ -1,5 +1,5 @@
 import type { GitHubClient } from "./client.js";
-import type { GhPullRequest, FetchPullRequestsOptions } from "./types.js";
+import type { GhPullRequest, GhPRComment, FetchPullRequestsOptions } from "./types.js";
 
 export async function* fetchPullRequests(
   client: GitHubClient,
@@ -50,6 +50,55 @@ export async function* fetchPullRequests(
         commits: detail.commits,
         draft: detail.draft ?? false,
         labels: detail.labels.map((l) => l.name),
+      };
+    }
+  }
+}
+
+export async function* fetchPRComments(
+  client: GitHubClient,
+  owner: string,
+  repo: string,
+  prNumber: number,
+): AsyncGenerator<GhPRComment> {
+  // Top-level PR thread comments
+  const issueIter = client.paginate.iterator(client.issues.listComments, {
+    owner,
+    repo,
+    issue_number: prNumber,
+    per_page: 100,
+  });
+  for await (const { data } of issueIter) {
+    for (const c of data) {
+      yield {
+        id: c.id,
+        pr_number: prNumber,
+        body: c.body ?? "",
+        user_login: c.user?.login ?? "",
+        created_at: c.created_at,
+        updated_at: c.updated_at,
+        comment_type: "issue_comment",
+      };
+    }
+  }
+
+  // Inline review comments
+  const reviewIter = client.paginate.iterator(client.pulls.listReviewComments, {
+    owner,
+    repo,
+    pull_number: prNumber,
+    per_page: 100,
+  });
+  for await (const { data } of reviewIter) {
+    for (const c of data) {
+      yield {
+        id: c.id,
+        pr_number: prNumber,
+        body: c.body,
+        user_login: c.user?.login ?? "",
+        created_at: c.created_at,
+        updated_at: c.updated_at,
+        comment_type: "review_comment",
       };
     }
   }

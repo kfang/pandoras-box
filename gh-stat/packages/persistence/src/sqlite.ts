@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import type { StorageProvider, GhRepo, GhPullRequest } from "./types.js";
+import type { StorageProvider, GhRepo, GhPullRequest, GhPRComment } from "./types.js";
 
 export class SqliteStorageProvider implements StorageProvider {
   private db: Database;
@@ -58,6 +58,18 @@ export class SqliteStorageProvider implements StorageProvider {
       CREATE TABLE IF NOT EXISTS sync_state (
         repo_full_name TEXT PRIMARY KEY,
         last_sync_time TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS pr_comments (
+        id INTEGER NOT NULL,
+        comment_type TEXT NOT NULL,
+        repo_full_name TEXT NOT NULL,
+        pr_number INTEGER NOT NULL,
+        body TEXT NOT NULL,
+        user_login TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (id, comment_type)
       );
     `);
   }
@@ -164,6 +176,27 @@ export class SqliteStorageProvider implements StorageProvider {
         $commits: pr.commits,
         $draft: pr.draft ? 1 : 0,
         $labels: JSON.stringify(pr.labels),
+      });
+  }
+
+  async saveComment(comment: GhPRComment, repoFullName: string): Promise<void> {
+    this.db
+      .prepare(`
+        INSERT INTO pr_comments (id, comment_type, repo_full_name, pr_number, body, user_login, created_at, updated_at)
+        VALUES ($id, $comment_type, $repo_full_name, $pr_number, $body, $user_login, $created_at, $updated_at)
+        ON CONFLICT(id, comment_type) DO UPDATE SET
+          body = excluded.body,
+          updated_at = excluded.updated_at
+      `)
+      .run({
+        $id: comment.id,
+        $comment_type: comment.comment_type,
+        $repo_full_name: repoFullName,
+        $pr_number: comment.pr_number,
+        $body: comment.body,
+        $user_login: comment.user_login,
+        $created_at: comment.created_at,
+        $updated_at: comment.updated_at,
       });
   }
 
