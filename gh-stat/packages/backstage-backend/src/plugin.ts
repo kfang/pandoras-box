@@ -5,7 +5,7 @@ import {
 import type { Request, Response, NextFunction } from "express";
 import { Router } from "express";
 import { createGitHubClient } from "@kfang/ghstat-github-data";
-import { BackstageStorageProvider, syncAll } from "@kfang/ghstat-persistence";
+import { createBackstageProvider, syncAll } from "@kfang/ghstat-persistence";
 import type { BackstageDatabaseService } from "@kfang/ghstat-persistence";
 import {
   calcPRVelocity,
@@ -33,7 +33,7 @@ export const ghStatPlugin = createBackendPlugin({
         const intervalSeconds = config.getOptionalNumber("ghStat.refresh.interval") ?? 3600;
 
         const client = createGitHubClient(token);
-        const storage = new BackstageStorageProvider(
+        const storage = createBackstageProvider(
           database as unknown as BackstageDatabaseService,
         );
 

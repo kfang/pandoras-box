@@ -1,0 +1,3 @@
+[0m[2m[35m$[0m [2m[1mtsc --noEmit[0m
+src/plugin.ts(8,10): error TS2724: '"@kfang/ghstat-persistence"' has no exported member named 'BackstageStorageProvider'. Did you mean 'KnexStorageProvider'?
+src/plugin.ts(89,47): error TS7006: Parameter 'r' implicitly has an 'any' type.

@@ -5,8 +5,11 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "bun run --filter '*' build",
-    "typecheck": "bun run --filter '*' typecheck",
-    "clean": "bun run --filter '*' clean"
+    "build": "nx run-many -t build",
+    "typecheck": "nx run-many -t typecheck",
+    "clean": "nx run-many -t clean"
+  },
+  "devDependencies": {
+    "nx": "^20.0.0"
   }
 }

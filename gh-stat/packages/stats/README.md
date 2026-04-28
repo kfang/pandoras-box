@@ -52,7 +52,7 @@ const health = calcRepoHealth(repos[0]!, prs);
 
 console.log(`Days since push: ${health.daysSinceLastPush}`);
 console.log(`Stale: ${health.isStale}`);         // true if 90+ days
-console.log(`Bus factor: ${health.busFactor}`);   // contributors with ≥10% of merges
+console.log(`Bus factor: ${health.busFactor}`);   // contributors with ≥10% of merged PRs
 console.log(`Open PR backlog: ${health.openPRBacklog}`);
 ```
 
@@ -162,14 +162,11 @@ Cycle time is measured from `created_at` to `merged_at`. PRs with negative cycle
 # from repo root
 bun install
 
-# build dependencies first
-bun x tsc --project packages/github-data/tsconfig.json
+# build (Nx builds upstream packages first)
+bunx nx run @kfang/ghstat-stats:build
 
 # typecheck
-bun x tsc --project packages/stats/tsconfig.json --noEmit
-
-# build
-bun x tsc --project packages/stats/tsconfig.json
+bunx nx run @kfang/ghstat-stats:typecheck
 ```
 
 Because all functions are pure, they are straightforward to unit test — pass in fixture arrays of `GhPullRequest` / `GhRepo` objects and assert on the result.

@@ -11,8 +11,6 @@ Backstage backend plugin for `gh-stat`. Uses Backstage's new backend system (`cr
 
 ```bash
 # in your Backstage backend package
-bun add @kfang/ghstat-backstage-backend
-# or
 yarn add @kfang/ghstat-backstage-backend
 ```
 
@@ -55,6 +53,7 @@ Table names are prefixed with `ghstat_` to avoid conflicts:
 - `ghstat_repos`
 - `ghstat_pull_requests`
 - `ghstat_sync_state`
+- `ghstat_pr_comments`
 
 ## REST API
 
@@ -87,16 +86,11 @@ The sync runs a full fetch of all configured orgs and repos, using the last-sync
 # from repo root
 bun install
 
-# build all dependencies in order
-bun x tsc --project packages/github-data/tsconfig.json
-bun x tsc --project packages/persistence/tsconfig.json
-bun x tsc --project packages/stats/tsconfig.json
+# build (Nx builds upstream packages first)
+bunx nx run @kfang/ghstat-backstage-backend:build
 
-# typecheck this package
-bun x tsc --project packages/backstage-backend/tsconfig.json --noEmit
-
-# build
-bun x tsc --project packages/backstage-backend/tsconfig.json
+# typecheck
+bunx nx run @kfang/ghstat-backstage-backend:typecheck
 ```
 
 To test the plugin locally, register it in a Backstage dev instance and check the Backstage logs for sync output. The `/api/gh-stat/repos` endpoint is the quickest way to confirm data is flowing in.
@@ -106,7 +100,4 @@ To test the plugin locally, register it in a Backstage dev instance and check th
 ```ts
 import { ghStatPlugin } from "@kfang/ghstat-backstage-backend";
 // ghStatPlugin: BackendFeature — pass to backend.add()
-
-import { syncAll } from "@kfang/ghstat-backstage-backend";
-// syncAll(client, storage, config) — exported for testing or custom scheduling
 ```

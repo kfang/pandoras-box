@@ -2,7 +2,7 @@ import { join, dirname } from "path";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { createGitHubClient } from "@kfang/ghstat-github-data";
-import { SqliteStorageProvider, syncAll } from "@kfang/ghstat-persistence";
+import { createSqliteProvider, syncAll } from "@kfang/ghstat-persistence";
 import { loadConfig } from "./config.js";
 import { handleRepos } from "./routes/repos.js";
 import { handlePulls } from "./routes/pulls.js";
@@ -26,7 +26,7 @@ const dataDir = dirname(dbPath);
 import { mkdirSync } from "fs";
 mkdirSync(dataDir, { recursive: true });
 
-const storage = new SqliteStorageProvider(dbPath);
+const storage = createSqliteProvider(dbPath);
 
 // ---- GitHub client ---------------------------------------------------------
 const client = createGitHubClient(config.github.token);

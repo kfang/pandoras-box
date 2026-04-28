@@ -1,0 +1,573 @@
+{
+  "nodes": {
+    "@kfang/ghstat-backstage-frontend": {
+      "name": "@kfang/ghstat-backstage-frontend",
+      "type": "lib",
+      "data": {
+        "root": "packages/backstage-frontend",
+        "name": "@kfang/ghstat-backstage-frontend",
+        "tags": [
+          "npm:public"
+        ],
+        "metadata": {
+          "targetGroups": {
+            "NPM Scripts": [
+              "build",
+              "typecheck",
+              "clean"
+            ]
+          },
+          "js": {
+            "packageName": "@kfang/ghstat-backstage-frontend",
+            "packageMain": "./dist/index.js",
+            "isInPackageManagerWorkspaces": true
+          }
+        },
+        "targets": {
+          "build": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "build"
+            },
+            "metadata": {
+              "scriptContent": "tsc --project tsconfig.json",
+              "runCommand": "bun run build -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "dependsOn": [
+              "^build"
+            ],
+            "outputs": [
+              "{projectRoot}/dist"
+            ],
+            "cache": true
+          },
+          "typecheck": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "typecheck"
+            },
+            "metadata": {
+              "scriptContent": "tsc --noEmit",
+              "runCommand": "bun run typecheck -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "dependsOn": [
+              "^build"
+            ],
+            "cache": true
+          },
+          "clean": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "clean"
+            },
+            "metadata": {
+              "scriptContent": "rm -rf dist",
+              "runCommand": "bun run clean -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "cache": false
+          },
+          "nx-release-publish": {
+            "executor": "@nx/js:release-publish",
+            "dependsOn": [
+              "^nx-release-publish"
+            ],
+            "options": {},
+            "configurations": {},
+            "parallelism": true
+          }
+        },
+        "implicitDependencies": []
+      }
+    },
+    "@kfang/ghstat-backstage-backend": {
+      "name": "@kfang/ghstat-backstage-backend",
+      "type": "lib",
+      "data": {
+        "root": "packages/backstage-backend",
+        "name": "@kfang/ghstat-backstage-backend",
+        "tags": [
+          "npm:public"
+        ],
+        "metadata": {
+          "targetGroups": {
+            "NPM Scripts": [
+              "build",
+              "typecheck",
+              "clean"
+            ]
+          },
+          "js": {
+            "packageName": "@kfang/ghstat-backstage-backend",
+            "packageMain": "./dist/index.js",
+            "isInPackageManagerWorkspaces": true
+          }
+        },
+        "targets": {
+          "build": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "build"
+            },
+            "metadata": {
+              "scriptContent": "tsc --project tsconfig.json",
+              "runCommand": "bun run build -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "dependsOn": [
+              "^build"
+            ],
+            "outputs": [
+              "{projectRoot}/dist"
+            ],
+            "cache": true
+          },
+          "typecheck": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "typecheck"
+            },
+            "metadata": {
+              "scriptContent": "tsc --noEmit",
+              "runCommand": "bun run typecheck -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "dependsOn": [
+              "^build"
+            ],
+            "cache": true
+          },
+          "clean": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "clean"
+            },
+            "metadata": {
+              "scriptContent": "rm -rf dist",
+              "runCommand": "bun run clean -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "cache": false
+          },
+          "nx-release-publish": {
+            "executor": "@nx/js:release-publish",
+            "dependsOn": [
+              "^nx-release-publish"
+            ],
+            "options": {},
+            "configurations": {},
+            "parallelism": true
+          }
+        },
+        "implicitDependencies": []
+      }
+    },
+    "@kfang/ghstat-github-data": {
+      "name": "@kfang/ghstat-github-data",
+      "type": "lib",
+      "data": {
+        "root": "packages/github-data",
+        "name": "@kfang/ghstat-github-data",
+        "tags": [
+          "npm:public"
+        ],
+        "metadata": {
+          "targetGroups": {
+            "NPM Scripts": [
+              "build",
+              "typecheck",
+              "clean"
+            ]
+          },
+          "js": {
+            "packageName": "@kfang/ghstat-github-data",
+            "packageMain": "./dist/index.js",
+            "isInPackageManagerWorkspaces": true
+          }
+        },
+        "targets": {
+          "build": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "build"
+            },
+            "metadata": {
+              "scriptContent": "tsc --project tsconfig.json",
+              "runCommand": "bun run build -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "dependsOn": [
+              "^build"
+            ],
+            "outputs": [
+              "{projectRoot}/dist"
+            ],
+            "cache": true
+          },
+          "typecheck": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "typecheck"
+            },
+            "metadata": {
+              "scriptContent": "tsc --noEmit",
+              "runCommand": "bun run typecheck -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "dependsOn": [
+              "^build"
+            ],
+            "cache": true
+          },
+          "clean": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "clean"
+            },
+            "metadata": {
+              "scriptContent": "rm -rf dist",
+              "runCommand": "bun run clean -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "cache": false
+          },
+          "nx-release-publish": {
+            "executor": "@nx/js:release-publish",
+            "dependsOn": [
+              "^nx-release-publish"
+            ],
+            "options": {},
+            "configurations": {},
+            "parallelism": true
+          }
+        },
+        "implicitDependencies": []
+      }
+    },
+    "@kfang/ghstat-persistence": {
+      "name": "@kfang/ghstat-persistence",
+      "type": "lib",
+      "data": {
+        "root": "packages/persistence",
+        "name": "@kfang/ghstat-persistence",
+        "tags": [
+          "npm:public"
+        ],
+        "metadata": {
+          "targetGroups": {
+            "NPM Scripts": [
+              "build",
+              "typecheck",
+              "clean"
+            ]
+          },
+          "js": {
+            "packageName": "@kfang/ghstat-persistence",
+            "packageMain": "./dist/index.js",
+            "isInPackageManagerWorkspaces": true
+          }
+        },
+        "targets": {
+          "build": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "build"
+            },
+            "metadata": {
+              "scriptContent": "tsc --project tsconfig.json",
+              "runCommand": "bun run build -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "dependsOn": [
+              "^build"
+            ],
+            "outputs": [
+              "{projectRoot}/dist"
+            ],
+            "cache": true
+          },
+          "typecheck": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "typecheck"
+            },
+            "metadata": {
+              "scriptContent": "tsc --noEmit",
+              "runCommand": "bun run typecheck -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "dependsOn": [
+              "^build"
+            ],
+            "cache": true
+          },
+          "clean": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "clean"
+            },
+            "metadata": {
+              "scriptContent": "rm -rf dist",
+              "runCommand": "bun run clean -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "cache": false
+          },
+          "nx-release-publish": {
+            "executor": "@nx/js:release-publish",
+            "dependsOn": [
+              "^nx-release-publish"
+            ],
+            "options": {},
+            "configurations": {},
+            "parallelism": true
+          }
+        },
+        "implicitDependencies": []
+      }
+    },
+    "@kfang/ghstat-server": {
+      "name": "@kfang/ghstat-server",
+      "type": "lib",
+      "data": {
+        "root": "packages/server",
+        "name": "@kfang/ghstat-server",
+        "tags": [
+          "npm:public"
+        ],
+        "metadata": {
+          "targetGroups": {
+            "NPM Scripts": [
+              "start",
+              "typecheck",
+              "clean"
+            ]
+          },
+          "js": {
+            "packageName": "@kfang/ghstat-server",
+            "isInPackageManagerWorkspaces": true
+          }
+        },
+        "targets": {
+          "start": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "start"
+            },
+            "metadata": {
+              "scriptContent": "bun run src/index.ts",
+              "runCommand": "bun run start -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
+          "typecheck": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "typecheck"
+            },
+            "metadata": {
+              "scriptContent": "tsc --noEmit",
+              "runCommand": "bun run typecheck -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "dependsOn": [
+              "^build"
+            ],
+            "cache": true
+          },
+          "clean": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "clean"
+            },
+            "metadata": {
+              "scriptContent": "rm -rf dist",
+              "runCommand": "bun run clean -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "cache": false
+          },
+          "nx-release-publish": {
+            "executor": "@nx/js:release-publish",
+            "dependsOn": [
+              "^nx-release-publish"
+            ],
+            "options": {},
+            "configurations": {},
+            "parallelism": true
+          }
+        },
+        "implicitDependencies": []
+      }
+    },
+    "@kfang/ghstat-stats": {
+      "name": "@kfang/ghstat-stats",
+      "type": "lib",
+      "data": {
+        "root": "packages/stats",
+        "name": "@kfang/ghstat-stats",
+        "tags": [
+          "npm:public"
+        ],
+        "metadata": {
+          "targetGroups": {
+            "NPM Scripts": [
+              "build",
+              "typecheck",
+              "clean"
+            ]
+          },
+          "js": {
+            "packageName": "@kfang/ghstat-stats",
+            "packageMain": "./dist/index.js",
+            "isInPackageManagerWorkspaces": true
+          }
+        },
+        "targets": {
+          "build": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "build"
+            },
+            "metadata": {
+              "scriptContent": "tsc --project tsconfig.json",
+              "runCommand": "bun run build -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "dependsOn": [
+              "^build"
+            ],
+            "outputs": [
+              "{projectRoot}/dist"
+            ],
+            "cache": true
+          },
+          "typecheck": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "typecheck"
+            },
+            "metadata": {
+              "scriptContent": "tsc --noEmit",
+              "runCommand": "bun run typecheck -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "dependsOn": [
+              "^build"
+            ],
+            "cache": true
+          },
+          "clean": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "clean"
+            },
+            "metadata": {
+              "scriptContent": "rm -rf dist",
+              "runCommand": "bun run clean -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "cache": false
+          },
+          "nx-release-publish": {
+            "executor": "@nx/js:release-publish",
+            "dependsOn": [
+              "^nx-release-publish"
+            ],
+            "options": {},
+            "configurations": {},
+            "parallelism": true
+          }
+        },
+        "implicitDependencies": []
+      }
+    }
+  },
+  "externalNodes": {},
+  "dependencies": {
+    "@kfang/ghstat-backstage-frontend": [
+      {
+        "source": "@kfang/ghstat-backstage-frontend",
+        "target": "@kfang/ghstat-github-data",
+        "type": "static"
+      },
+      {
+        "source": "@kfang/ghstat-backstage-frontend",
+        "target": "@kfang/ghstat-stats",
+        "type": "static"
+      }
+    ],
+    "@kfang/ghstat-backstage-backend": [
+      {
+        "source": "@kfang/ghstat-backstage-backend",
+        "target": "@kfang/ghstat-github-data",
+        "type": "static"
+      },
+      {
+        "source": "@kfang/ghstat-backstage-backend",
+        "target": "@kfang/ghstat-persistence",
+        "type": "static"
+      },
+      {
+        "source": "@kfang/ghstat-backstage-backend",
+        "target": "@kfang/ghstat-stats",
+        "type": "static"
+      }
+    ],
+    "@kfang/ghstat-github-data": [],
+    "@kfang/ghstat-persistence": [
+      {
+        "source": "@kfang/ghstat-persistence",
+        "target": "@kfang/ghstat-github-data",
+        "type": "static"
+      }
+    ],
+    "@kfang/ghstat-server": [
+      {
+        "source": "@kfang/ghstat-server",
+        "target": "@kfang/ghstat-github-data",
+        "type": "static"
+      },
+      {
+        "source": "@kfang/ghstat-server",
+        "target": "@kfang/ghstat-persistence",
+        "type": "static"
+      },
+      {
+        "source": "@kfang/ghstat-server",
+        "target": "@kfang/ghstat-stats",
+        "type": "static"
+      }
+    ],
+    "@kfang/ghstat-stats": [
+      {
+        "source": "@kfang/ghstat-stats",
+        "target": "@kfang/ghstat-github-data",
+        "type": "static"
+      }
+    ]
+  },
+  "version": "6.0",
+  "errors": [],
+  "computedAt": 1777399852493
+}

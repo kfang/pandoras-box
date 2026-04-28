@@ -1,0 +1,2 @@
+[0m[2m[35m$[0m [2m[1mtsc --noEmit[0m
+src/index.ts(5,10): error TS2724: '"@kfang/ghstat-persistence"' has no exported member named 'SqliteStorageProvider'. Did you mean 'StorageProvider'?

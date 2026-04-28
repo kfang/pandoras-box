@@ -19,7 +19,10 @@ export GITHUB_TOKEN=ghp_...
 # 3. Edit config.yaml to add your orgs/repos
 #    See Configuration section below
 
-# 4. Start the server
+# 4. Build dependencies
+bun run build
+
+# 5. Start the server
 bun run packages/server/src/index.ts
 ```
 
@@ -91,7 +94,7 @@ All endpoints return JSON. Error responses return a plain text or JSON body with
 |---|---|---|
 | `POST` | `/api/sync` | Trigger a manual sync (runs in the background) |
 
-### Example responses
+### Example response
 
 **`GET /api/stats/owner/my-repo`**
 
@@ -136,13 +139,11 @@ The dashboard has no build step — Alpine.js is loaded from CDN.
 # from repo root
 bun install
 
-# build all dependencies
-bun x tsc --project packages/github-data/tsconfig.json
-bun x tsc --project packages/persistence/tsconfig.json
-bun x tsc --project packages/stats/tsconfig.json
+# build all packages (Nx handles dependency ordering)
+bun run build
 
-# typecheck (server itself has noEmit; it runs directly from source)
-bun x tsc --project packages/server/tsconfig.json --noEmit
+# typecheck (server runs directly from source, no emit)
+bunx nx run @kfang/ghstat-server:typecheck
 
 # run in development (Bun runs TypeScript directly, no build needed)
 CONFIG_PATH=./config.yaml bun run packages/server/src/index.ts
@@ -156,7 +157,7 @@ The server package does not emit compiled output — Bun runs `src/index.ts` dir
 FROM oven/bun:1 AS base
 WORKDIR /app
 
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 COPY packages/ ./packages/
 RUN bun install --frozen-lockfile
 

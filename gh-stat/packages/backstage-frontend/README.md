@@ -12,8 +12,6 @@ Backstage frontend plugin for `gh-stat`. Provides a React-based dashboard with o
 ```bash
 # in your Backstage app package
 yarn add @kfang/ghstat-backstage-frontend
-# or
-bun add @kfang/ghstat-backstage-frontend
 ```
 
 ## Setup
@@ -131,15 +129,11 @@ interface GhStatApi {
 # from repo root
 bun install
 
-# build all dependencies in order
-bun x tsc --project packages/github-data/tsconfig.json
-bun x tsc --project packages/stats/tsconfig.json
+# build (Nx builds upstream packages first)
+bunx nx run @kfang/ghstat-backstage-frontend:build
 
-# typecheck this package
-bun x tsc --project packages/backstage-frontend/tsconfig.json --noEmit
-
-# build
-bun x tsc --project packages/backstage-frontend/tsconfig.json
+# typecheck
+bunx nx run @kfang/ghstat-backstage-frontend:typecheck
 ```
 
 The package uses `jsx: react-jsx` — no `React` import needed in `.tsx` files. Styles are inline `style` props, so there are no CSS files to configure.

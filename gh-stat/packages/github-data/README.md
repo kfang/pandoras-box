@@ -68,6 +68,18 @@ for await (const pr of fetchPullRequests(client, "owner", "repo", { state: "all"
 
 `fetchPullRequests` fetches the detailed PR endpoint for each result to get `additions`, `deletions`, and `changed_files`. This costs one extra API call per PR — use `since` for incremental updates to keep within rate limits.
 
+### Fetch PR comments
+
+```ts
+import { fetchPRComments } from "@kfang/ghstat-github-data";
+
+for await (const comment of fetchPRComments(client, "owner", "repo", 42)) {
+  console.log(comment.comment_type, comment.user_login, comment.body);
+}
+```
+
+Returns both issue-style comments (`comment_type: "issue_comment"`) and code review comments (`comment_type: "review_comment"`).
+
 ## API
 
 ### `createGitHubClient(token: string): GitHubClient`
@@ -96,6 +108,10 @@ Paginates through pull requests, sorted by `updated_at` descending. Stops early 
 | `state` | `"open" \| "closed" \| "all"` | `"all"` | Filter by PR state |
 | `since` | `Date` | — | Stop pagination when PRs are older than this date |
 | `perPage` | `number` | `100` | Page size |
+
+### `fetchPRComments(client, owner, repo, prNumber): AsyncGenerator<GhPRComment>`
+
+Fetches all comments for a pull request — both issue-level thread comments and inline code review comments.
 
 ## Types
 
@@ -144,17 +160,29 @@ Paginates through pull requests, sorted by `updated_at` descending. Stops early 
 | `draft` | `boolean` | |
 | `labels` | `string[]` | Label names |
 
+### `GhPRComment`
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `number` | GitHub numeric ID |
+| `comment_type` | `"issue_comment" \| "review_comment"` | |
+| `pr_number` | `number` | PR this comment belongs to |
+| `body` | `string` | Comment text |
+| `user_login` | `string` | Author's GitHub login |
+| `created_at` | `string` | ISO 8601 |
+| `updated_at` | `string` | ISO 8601 |
+
 ## Development
 
 ```bash
 # from repo root
 bun install
 
-# typecheck
-bun x tsc --project packages/github-data/tsconfig.json --noEmit
+# build
+bunx nx run @kfang/ghstat-github-data:build
 
-# build (emit to dist/)
-bun x tsc --project packages/github-data/tsconfig.json
+# typecheck
+bunx nx run @kfang/ghstat-github-data:typecheck
 ```
 
 The package targets `ES2022` with `moduleResolution: bundler`. Output goes to `dist/` with declaration maps for source navigation.
