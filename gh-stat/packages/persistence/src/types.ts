@@ -1,6 +1,6 @@
-import type { GhRepo, GhPullRequest, GhPRReview, GhPRComment } from "@kfang/ghstat-github-data";
+import type { GhRepo, GhPullRequest, GhPRReview, GhPRComment, GhPRTimelineEvent } from "@kfang/ghstat-github-data";
 
-export type { GhRepo, GhPullRequest, GhPRReview, GhPRComment };
+export type { GhRepo, GhPullRequest, GhPRReview, GhPRComment, GhPRTimelineEvent };
 
 export interface StorageProvider {
   /** Upsert a repo record */
@@ -19,6 +19,10 @@ export interface StorageProvider {
   getReviews(repoFullName: string, prNumber?: number): Promise<GhPRReview[]>;
   /** Get comments, optionally filtered to a single PR */
   getComments(repoFullName: string, prNumber?: number): Promise<GhPRComment[]>;
+  /** Upsert a PR timeline event record */
+  saveTimelineEvent(event: GhPRTimelineEvent, repoFullName: string): Promise<void>;
+  /** Get timeline events, optionally filtered to a single PR */
+  getTimelineEvents(repoFullName: string, prNumber?: number): Promise<GhPRTimelineEvent[]>;
   /** Get the timestamp of the last successful sync for a repo */
   getLastSyncTime(repoFullName: string): Promise<Date | null>;
   /** Record a successful sync timestamp for a repo */

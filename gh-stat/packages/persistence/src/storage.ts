@@ -1,5 +1,5 @@
 import knex, { type Knex } from "knex";
-import type { StorageProvider, GhRepo, GhPullRequest, GhPRReview, GhPRComment } from "./types.js";
+import type { StorageProvider, GhRepo, GhPullRequest, GhPRReview, GhPRComment, GhPRTimelineEvent } from "./types.js";
 
 interface Migration {
   version: number;
@@ -19,6 +19,7 @@ interface TableNames {
   syncState: string;
   prComments: string;
   prReviews: string;
+  prTimelineEvents: string;
   migrations: string;
 }
 
@@ -29,6 +30,7 @@ function withPrefix(p: string): TableNames {
     syncState: `${p}sync_state`,
     prComments: `${p}pr_comments`,
     prReviews: `${p}pr_reviews`,
+    prTimelineEvents: `${p}pr_timeline_events`,
     migrations: `${p}schema_migrations`,
   };
 }
@@ -43,7 +45,7 @@ export class KnexStorageProvider implements StorageProvider {
   }
 
   private buildMigrations(): ReadonlyArray<Migration> {
-    const { repos, pullRequests, syncState, prComments, prReviews } = this.t;
+    const { repos, pullRequests, syncState, prComments, prReviews, prTimelineEvents } = this.t;
     return [
       {
         version: 1,
@@ -130,6 +132,23 @@ export class KnexStorageProvider implements StorageProvider {
           submitted_at TEXT NOT NULL
         )`,
       },
+      {
+        version: 6,
+        table: prTimelineEvents,
+        sql: `CREATE TABLE ${prTimelineEvents} (
+          id INTEGER NOT NULL PRIMARY KEY,
+          repo_full_name TEXT NOT NULL,
+          pr_number INTEGER NOT NULL,
+          event TEXT NOT NULL,
+          actor_login TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        )`,
+      },
+      {
+        version: 7,
+        table: pullRequests,
+        sql: `ALTER TABLE ${pullRequests} ADD COLUMN ready_for_review_at TEXT`,
+      },
     ];
   }
 
@@ -215,6 +234,7 @@ export class KnexStorageProvider implements StorageProvider {
         commits: pr.commits,
         draft: pr.draft ? 1 : 0,
         labels: JSON.stringify(pr.labels),
+        ready_for_review_at: pr.ready_for_review_at,
       })
       .onConflict(["repo_full_name", "number"])
       .merge();
@@ -251,6 +271,40 @@ export class KnexStorageProvider implements StorageProvider {
       })
       .onConflict("id")
       .merge();
+  }
+
+  async saveTimelineEvent(event: GhPRTimelineEvent, repoFullName: string): Promise<void> {
+    const db = await this.dbPromise;
+    await db(this.t.prTimelineEvents)
+      .insert({
+        id: event.id,
+        repo_full_name: repoFullName,
+        pr_number: event.pr_number,
+        event: event.event,
+        actor_login: event.actor_login,
+        created_at: event.created_at,
+      })
+      .onConflict("id")
+      .merge();
+  }
+
+  async getTimelineEvents(repoFullName: string, prNumber?: number): Promise<GhPRTimelineEvent[]> {
+    const db = await this.dbPromise;
+    let query = db(this.t.prTimelineEvents)
+      .select("*")
+      .where({ repo_full_name: repoFullName })
+      .orderBy("created_at", "asc");
+    if (prNumber !== undefined) {
+      query = query.where({ pr_number: prNumber });
+    }
+    const rows = (await query) as unknown as Record<string, unknown>[];
+    return rows.map((row) => ({
+      id: row["id"] as number,
+      pr_number: row["pr_number"] as number,
+      event: row["event"] as string,
+      actor_login: row["actor_login"] as string,
+      created_at: row["created_at"] as string,
+    }));
   }
 
   async getRepos(filter?: { org?: string }): Promise<GhRepo[]> {
@@ -306,6 +360,7 @@ export class KnexStorageProvider implements StorageProvider {
       commits: row["commits"] as number,
       draft: Boolean(row["draft"]),
       labels: JSON.parse(row["labels"] as string) as string[],
+      ready_for_review_at: (row["ready_for_review_at"] as string | null) ?? null,
     }));
   }
 

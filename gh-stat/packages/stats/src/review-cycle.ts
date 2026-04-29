@@ -42,7 +42,7 @@ export function calcReviewCycle(
     if (external.length === 0) continue;
 
     const firstReviewTime = new Date(external[0]!.submitted_at).getTime();
-    const createdTime = new Date(pr.created_at).getTime();
+    const createdTime = new Date(pr.ready_for_review_at ?? pr.created_at).getTime();
     const timeToFirstReview = firstReviewTime - createdTime;
 
     const feedbackLoops = external.filter((r) => r.state === "CHANGES_REQUESTED").length;

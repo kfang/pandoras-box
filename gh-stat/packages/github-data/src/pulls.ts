@@ -1,5 +1,5 @@
 import type { GitHubClient } from "./client.js";
-import type { GhPullRequest, GhPRReview, GhPRComment, FetchPullRequestsOptions } from "./types.js";
+import type { GhPullRequest, GhPRReview, GhPRComment, GhPRTimelineEvent, FetchPullRequestsOptions } from "./types.js";
 
 export async function* fetchPullRequests(
   client: GitHubClient,
@@ -50,6 +50,7 @@ export async function* fetchPullRequests(
         commits: detail.commits,
         draft: detail.draft ?? false,
         labels: detail.labels.map((l) => l.name),
+        ready_for_review_at: null,
       };
     }
   }
@@ -127,6 +128,36 @@ export async function* fetchPRReviews(
         state: r.state as GhPRReview["state"],
         body: r.body ?? "",
         submitted_at: r.submitted_at,
+      };
+    }
+  }
+}
+
+const TIMELINE_EVENTS_OF_INTEREST = new Set(["ready_for_review", "convert_to_draft"]);
+
+export async function* fetchPRTimelineEvents(
+  client: GitHubClient,
+  owner: string,
+  repo: string,
+  prNumber: number,
+): AsyncGenerator<GhPRTimelineEvent> {
+  const iter = client.paginate.iterator(client.issues.listEventsForTimeline, {
+    owner,
+    repo,
+    issue_number: prNumber,
+    per_page: 100,
+  });
+  for await (const { data } of iter) {
+    for (const item of data) {
+      const event = item as Record<string, unknown>;
+      const eventType = event["event"] as string | undefined;
+      if (!eventType || !TIMELINE_EVENTS_OF_INTEREST.has(eventType)) continue;
+      yield {
+        id: event["id"] as number,
+        pr_number: prNumber,
+        event: eventType,
+        actor_login: ((event["actor"] as Record<string, unknown> | undefined)?.["login"] as string) ?? "",
+        created_at: event["created_at"] as string,
       };
     }
   }

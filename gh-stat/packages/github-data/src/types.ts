@@ -37,6 +37,8 @@ export interface GhPullRequest {
   commits: number;
   draft: boolean;
   labels: string[];
+  /** ISO timestamp of the "ready for review" event, or null if the PR was never a draft. */
+  ready_for_review_at: string | null;
 }
 
 export interface FetchPullRequestsOptions {
@@ -52,6 +54,14 @@ export interface GhPRReview {
   state: "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED" | "DISMISSED" | "PENDING";
   body: string;
   submitted_at: string;
+}
+
+export interface GhPRTimelineEvent {
+  id: number;
+  pr_number: number;
+  event: string;
+  actor_login: string;
+  created_at: string;
 }
 
 export interface GhPRComment {

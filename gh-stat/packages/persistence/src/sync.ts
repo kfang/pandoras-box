@@ -1,5 +1,5 @@
 import type { GitHubClient } from "@kfang/ghstat-github-data";
-import { fetchRepo, fetchOrgRepos, fetchPullRequests, fetchPRComments, fetchPRReviews } from "@kfang/ghstat-github-data";
+import { fetchRepo, fetchOrgRepos, fetchPullRequests, fetchPRComments, fetchPRReviews, fetchPRTimelineEvents } from "@kfang/ghstat-github-data";
 import type { StorageProvider } from "./types.js";
 
 export interface SyncConfig {
@@ -88,6 +88,25 @@ export async function syncAll(
           }
         } catch (err) {
           logger.error(`Failed to sync reviews for ${fullName}#${pr.number}`, err);
+        }
+
+        try {
+          for await (const event of fetchPRTimelineEvents(client, owner, repo, pr.number)) {
+            await storage.saveTimelineEvent(event, fullName);
+          }
+          // Compute ready_for_review_at from saved timeline events
+          const events = await storage.getTimelineEvents(fullName, pr.number);
+          const readyEvent = events
+            .filter((e) => e.event === "ready_for_review")
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+          if (readyEvent) {
+            await storage.savePullRequest(
+              { ...pr, ready_for_review_at: readyEvent.created_at },
+              fullName,
+            );
+          }
+        } catch (err) {
+          logger.error(`Failed to sync timeline events for ${fullName}#${pr.number}`, err);
         }
       }
       await storage.setLastSyncTime(fullName, new Date());
