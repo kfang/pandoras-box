@@ -1,5 +1,5 @@
 import type { GitHubClient } from "@kfang/ghstat-github-data";
-import { fetchRepo, fetchOrgRepos, fetchPullRequests, fetchPRComments } from "@kfang/ghstat-github-data";
+import { fetchRepo, fetchOrgRepos, fetchPullRequests, fetchPRComments, fetchPRReviews } from "@kfang/ghstat-github-data";
 import type { StorageProvider } from "./types.js";
 
 export interface SyncConfig {
@@ -80,6 +80,14 @@ export async function syncAll(
           }
         } catch (err) {
           logger.error(`Failed to sync comments for ${fullName}#${pr.number}`, err);
+        }
+
+        try {
+          for await (const review of fetchPRReviews(client, owner, repo, pr.number)) {
+            await storage.saveReview(review, fullName);
+          }
+        } catch (err) {
+          logger.error(`Failed to sync reviews for ${fullName}#${pr.number}`, err);
         }
       }
       await storage.setLastSyncTime(fullName, new Date());

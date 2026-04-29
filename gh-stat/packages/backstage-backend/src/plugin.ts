@@ -12,8 +12,23 @@ import {
   calcContributorStats,
   calcRepoHealth,
   calcOrgRollups,
+  calcReviewCycle,
+  calcCommentAnalysis,
 } from "@kfang/ghstat-stats";
-import type { GhPullRequest } from "@kfang/ghstat-github-data";
+import type { GhPullRequest, GhPRReview } from "@kfang/ghstat-github-data";
+
+function groupReviewsByPR(reviews: GhPRReview[]): Map<number, GhPRReview[]> {
+  const map = new Map<number, GhPRReview[]>();
+  for (const r of reviews) {
+    let arr = map.get(r.pr_number);
+    if (!arr) {
+      arr = [];
+      map.set(r.pr_number, arr);
+    }
+    arr.push(r);
+  }
+  return map;
+}
 
 export const ghStatPlugin = createBackendPlugin({
   pluginId: "gh-stat",
@@ -69,10 +84,21 @@ export const ghStatPlugin = createBackendPlugin({
               const { org } = req.params;
               const repoList = await storage.getRepos({ org: org! });
               const prsByRepo = new Map<string, GhPullRequest[]>();
+              const allReviews: GhPRReview[] = [];
               for (const r of repoList) {
                 prsByRepo.set(r.full_name, await storage.getPullRequests(r.full_name));
+                allReviews.push(...(await storage.getReviews(r.full_name)));
               }
-              res.json(calcOrgRollups(repoList, prsByRepo, org!));
+              const allPRs = [...prsByRepo.values()].flat();
+              const allComments = (
+                await Promise.all(repoList.map((r) => storage.getComments(r.full_name)))
+              ).flat();
+              const reviewsByPR = groupReviewsByPR(allReviews);
+              res.json({
+                ...calcOrgRollups(repoList, prsByRepo, org!),
+                reviewCycle: calcReviewCycle(allPRs, reviewsByPR),
+                commentAnalysis: calcCommentAnalysis(allComments, allPRs),
+              });
             } catch (err) {
               next(err);
             }
@@ -92,11 +118,16 @@ export const ghStatPlugin = createBackendPlugin({
                 return;
               }
               const prs = await storage.getPullRequests(fullName);
+              const reviews = await storage.getReviews(fullName);
+              const comments = await storage.getComments(fullName);
+              const reviewsByPR = groupReviewsByPR(reviews);
               res.json({
                 repo: fullName,
                 velocity: calcPRVelocity(prs),
                 contributors: calcContributorStats(prs),
                 health: calcRepoHealth(repoData, prs),
+                reviewCycle: calcReviewCycle(prs, reviewsByPR),
+                commentAnalysis: calcCommentAnalysis(comments, prs),
               });
             } catch (err) {
               next(err);

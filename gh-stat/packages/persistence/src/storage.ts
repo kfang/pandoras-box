@@ -1,5 +1,5 @@
 import knex, { type Knex } from "knex";
-import type { StorageProvider, GhRepo, GhPullRequest, GhPRComment } from "./types.js";
+import type { StorageProvider, GhRepo, GhPullRequest, GhPRReview, GhPRComment } from "./types.js";
 
 interface Migration {
   version: number;
@@ -18,6 +18,7 @@ interface TableNames {
   pullRequests: string;
   syncState: string;
   prComments: string;
+  prReviews: string;
   migrations: string;
 }
 
@@ -27,6 +28,7 @@ function withPrefix(p: string): TableNames {
     pullRequests: `${p}pull_requests`,
     syncState: `${p}sync_state`,
     prComments: `${p}pr_comments`,
+    prReviews: `${p}pr_reviews`,
     migrations: `${p}schema_migrations`,
   };
 }
@@ -41,7 +43,7 @@ export class KnexStorageProvider implements StorageProvider {
   }
 
   private buildMigrations(): ReadonlyArray<Migration> {
-    const { repos, pullRequests, syncState, prComments } = this.t;
+    const { repos, pullRequests, syncState, prComments, prReviews } = this.t;
     return [
       {
         version: 1,
@@ -113,6 +115,19 @@ export class KnexStorageProvider implements StorageProvider {
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL,
           PRIMARY KEY (id, comment_type)
+        )`,
+      },
+      {
+        version: 5,
+        table: prReviews,
+        sql: `CREATE TABLE ${prReviews} (
+          id INTEGER NOT NULL PRIMARY KEY,
+          repo_full_name TEXT NOT NULL,
+          pr_number INTEGER NOT NULL,
+          user_login TEXT NOT NULL,
+          state TEXT NOT NULL,
+          body TEXT NOT NULL,
+          submitted_at TEXT NOT NULL
         )`,
       },
     ];
@@ -222,6 +237,22 @@ export class KnexStorageProvider implements StorageProvider {
       .merge();
   }
 
+  async saveReview(review: GhPRReview, repoFullName: string): Promise<void> {
+    const db = await this.dbPromise;
+    await db(this.t.prReviews)
+      .insert({
+        id: review.id,
+        repo_full_name: repoFullName,
+        pr_number: review.pr_number,
+        user_login: review.user_login,
+        state: review.state,
+        body: review.body,
+        submitted_at: review.submitted_at,
+      })
+      .onConflict("id")
+      .merge();
+  }
+
   async getRepos(filter?: { org?: string }): Promise<GhRepo[]> {
     const db = await this.dbPromise;
     let query = db(this.t.repos).select("*").orderBy("pushed_at", "desc");
@@ -275,6 +306,47 @@ export class KnexStorageProvider implements StorageProvider {
       commits: row["commits"] as number,
       draft: Boolean(row["draft"]),
       labels: JSON.parse(row["labels"] as string) as string[],
+    }));
+  }
+
+  async getReviews(repoFullName: string, prNumber?: number): Promise<GhPRReview[]> {
+    const db = await this.dbPromise;
+    let query = db(this.t.prReviews)
+      .select("*")
+      .where({ repo_full_name: repoFullName })
+      .orderBy("submitted_at", "asc");
+    if (prNumber !== undefined) {
+      query = query.where({ pr_number: prNumber });
+    }
+    const rows = (await query) as unknown as Record<string, unknown>[];
+    return rows.map((row) => ({
+      id: row["id"] as number,
+      pr_number: row["pr_number"] as number,
+      user_login: row["user_login"] as string,
+      state: row["state"] as GhPRReview["state"],
+      body: row["body"] as string,
+      submitted_at: row["submitted_at"] as string,
+    }));
+  }
+
+  async getComments(repoFullName: string, prNumber?: number): Promise<GhPRComment[]> {
+    const db = await this.dbPromise;
+    let query = db(this.t.prComments)
+      .select("*")
+      .where({ repo_full_name: repoFullName })
+      .orderBy("created_at", "asc");
+    if (prNumber !== undefined) {
+      query = query.where({ pr_number: prNumber });
+    }
+    const rows = (await query) as unknown as Record<string, unknown>[];
+    return rows.map((row) => ({
+      id: row["id"] as number,
+      pr_number: row["pr_number"] as number,
+      body: row["body"] as string,
+      user_login: row["user_login"] as string,
+      created_at: row["created_at"] as string,
+      updated_at: row["updated_at"] as string,
+      comment_type: row["comment_type"] as GhPRComment["comment_type"],
     }));
   }
 

@@ -45,6 +45,15 @@ export interface FetchPullRequestsOptions {
   perPage?: number;
 }
 
+export interface GhPRReview {
+  id: number;
+  pr_number: number;
+  user_login: string;
+  state: "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED" | "DISMISSED" | "PENDING";
+  body: string;
+  submitted_at: string;
+}
+
 export interface GhPRComment {
   id: number;
   pr_number: number;

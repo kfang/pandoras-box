@@ -6,18 +6,6 @@
   "fileMap": {
     "nonProjectFiles": [
       {
-        "file": ".claude/settings.local.json",
-        "hash": "3817890598644426823"
-      },
-      {
-        "file": "bun.lock",
-        "hash": "10948106664280818947"
-      },
-      {
-        "file": "package.json",
-        "hash": "14167181570520928138"
-      },
-      {
         "file": ".gitignore",
         "hash": "316787967807637398"
       },
@@ -26,117 +14,31 @@
         "hash": "629364590678780099"
       },
       {
-        "file": "config.example.yaml",
-        "hash": "7482870889460463936"
-      },
-      {
-        "file": "tsconfig.base.json",
-        "hash": "16468421291409366212"
-      },
-      {
         "file": "SPEC.md",
         "hash": "2836934787932516073"
       },
       {
+        "file": "bun.lock",
+        "hash": "10948106664280818947"
+      },
+      {
+        "file": "config.example.yaml",
+        "hash": "7482870889460463936"
+      },
+      {
         "file": "nx.json",
         "hash": "12192864558625187857"
+      },
+      {
+        "file": "package.json",
+        "hash": "14167181570520928138"
+      },
+      {
+        "file": "tsconfig.base.json",
+        "hash": "16468421291409366212"
       }
     ],
     "projectFileMap": {
-      "@kfang/ghstat-persistence": [
-        {
-          "file": "packages/persistence/README.md",
-          "hash": "9751139047003661853"
-        },
-        {
-          "file": "packages/persistence/package.json",
-          "hash": "14598519950135770019",
-          "deps": [
-            "@kfang/ghstat-github-data"
-          ]
-        },
-        {
-          "file": "packages/persistence/src/index.ts",
-          "hash": "13589168937271942560"
-        },
-        {
-          "file": "packages/persistence/src/storage.ts",
-          "hash": "9991547097461176124"
-        },
-        {
-          "file": "packages/persistence/src/sync.ts",
-          "hash": "11980052187791149490"
-        },
-        {
-          "file": "packages/persistence/src/types.ts",
-          "hash": "14359626833476341396"
-        },
-        {
-          "file": "packages/persistence/tsconfig.json",
-          "hash": "8266538489508554396"
-        }
-      ],
-      "@kfang/ghstat-github-data": [
-        {
-          "file": "packages/github-data/README.md",
-          "hash": "14191053834401691982"
-        },
-        {
-          "file": "packages/github-data/package.json",
-          "hash": "2324199771170651574"
-        },
-        {
-          "file": "packages/github-data/src/client.ts",
-          "hash": "8829136615674907667"
-        },
-        {
-          "file": "packages/github-data/src/index.ts",
-          "hash": "11853277928148267097"
-        },
-        {
-          "file": "packages/github-data/src/pulls.ts",
-          "hash": "3173337632694495788"
-        },
-        {
-          "file": "packages/github-data/src/repos.ts",
-          "hash": "5550191099946193639"
-        },
-        {
-          "file": "packages/github-data/src/types.ts",
-          "hash": "4232572575461285250"
-        },
-        {
-          "file": "packages/github-data/tsconfig.json",
-          "hash": "8266538489508554396"
-        }
-      ],
-      "@kfang/ghstat-backstage-backend": [
-        {
-          "file": "packages/backstage-backend/README.md",
-          "hash": "10178636993641756511"
-        },
-        {
-          "file": "packages/backstage-backend/package.json",
-          "hash": "8630797278308180450",
-          "deps": [
-            "@kfang/ghstat-github-data",
-            "@kfang/ghstat-persistence",
-            "@kfang/ghstat-stats"
-          ]
-        },
-        {
-          "file": "packages/backstage-backend/src/index.ts",
-          "hash": "3771379011815193874"
-        },
-        {
-          "file": "packages/backstage-backend/src/plugin.ts",
-          "hash": "12555474068969840443"
-        },
-        {
-          "file": "packages/backstage-backend/tsconfig.json",
-          "hash": "8266538489508554396"
-        }
-      ],
       "@kfang/ghstat-backstage-frontend": [
         {
           "file": "packages/backstage-frontend/README.md",
@@ -187,6 +89,67 @@
           "hash": "2425498225896553038"
         }
       ],
+      "@kfang/ghstat-backstage-backend": [
+        {
+          "file": "packages/backstage-backend/README.md",
+          "hash": "10178636993641756511"
+        },
+        {
+          "file": "packages/backstage-backend/package.json",
+          "hash": "8630797278308180450",
+          "deps": [
+            "@kfang/ghstat-github-data",
+            "@kfang/ghstat-persistence",
+            "@kfang/ghstat-stats"
+          ]
+        },
+        {
+          "file": "packages/backstage-backend/src/index.ts",
+          "hash": "3771379011815193874"
+        },
+        {
+          "file": "packages/backstage-backend/src/plugin.ts",
+          "hash": "6328984900016165654"
+        },
+        {
+          "file": "packages/backstage-backend/tsconfig.json",
+          "hash": "8266538489508554396"
+        }
+      ],
+      "@kfang/ghstat-github-data": [
+        {
+          "file": "packages/github-data/README.md",
+          "hash": "14191053834401691982"
+        },
+        {
+          "file": "packages/github-data/package.json",
+          "hash": "2324199771170651574"
+        },
+        {
+          "file": "packages/github-data/src/client.ts",
+          "hash": "8829136615674907667"
+        },
+        {
+          "file": "packages/github-data/src/index.ts",
+          "hash": "12098430371659510891"
+        },
+        {
+          "file": "packages/github-data/src/pulls.ts",
+          "hash": "9598132969156484182"
+        },
+        {
+          "file": "packages/github-data/src/repos.ts",
+          "hash": "5550191099946193639"
+        },
+        {
+          "file": "packages/github-data/src/types.ts",
+          "hash": "6070385925184401068"
+        },
+        {
+          "file": "packages/github-data/tsconfig.json",
+          "hash": "8266538489508554396"
+        }
+      ],
       "@kfang/ghstat-stats": [
         {
           "file": "packages/stats/README.md",
@@ -200,12 +163,16 @@
           ]
         },
         {
+          "file": "packages/stats/src/comment-analysis.ts",
+          "hash": "6118581679336567146"
+        },
+        {
           "file": "packages/stats/src/contributors.ts",
           "hash": "8080052587688515593"
         },
         {
           "file": "packages/stats/src/index.ts",
-          "hash": "9015146431506113473"
+          "hash": "12018173228962663200"
         },
         {
           "file": "packages/stats/src/org-rollups.ts",
@@ -213,11 +180,19 @@
         },
         {
           "file": "packages/stats/src/pr-velocity.ts",
-          "hash": "4309428099133966221"
+          "hash": "7990433708884026439"
         },
         {
           "file": "packages/stats/src/repo-health.ts",
           "hash": "12060941760737919170"
+        },
+        {
+          "file": "packages/stats/src/review-cycle.ts",
+          "hash": "13165724784164387198"
+        },
+        {
+          "file": "packages/stats/src/util.ts",
+          "hash": "6325336042259265458"
         },
         {
           "file": "packages/stats/tsconfig.json",
@@ -256,7 +231,7 @@
         },
         {
           "file": "packages/server/src/routes/stats.ts",
-          "hash": "14552002824098618948"
+          "hash": "2704993254253103512"
         },
         {
           "file": "packages/server/src/views/index.html",
@@ -273,6 +248,39 @@
         {
           "file": "packages/server/tsconfig.json",
           "hash": "14696566888258402744"
+        }
+      ],
+      "@kfang/ghstat-persistence": [
+        {
+          "file": "packages/persistence/README.md",
+          "hash": "9751139047003661853"
+        },
+        {
+          "file": "packages/persistence/package.json",
+          "hash": "14598519950135770019",
+          "deps": [
+            "@kfang/ghstat-github-data"
+          ]
+        },
+        {
+          "file": "packages/persistence/src/index.ts",
+          "hash": "13589168937271942560"
+        },
+        {
+          "file": "packages/persistence/src/storage.ts",
+          "hash": "16913025693125784343"
+        },
+        {
+          "file": "packages/persistence/src/sync.ts",
+          "hash": "67361397947074520"
+        },
+        {
+          "file": "packages/persistence/src/types.ts",
+          "hash": "15637975584927183331"
+        },
+        {
+          "file": "packages/persistence/tsconfig.json",
+          "hash": "8266538489508554396"
         }
       ]
     }

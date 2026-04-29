@@ -1,5 +1,5 @@
 import type { GitHubClient } from "./client.js";
-import type { GhPullRequest, GhPRComment, FetchPullRequestsOptions } from "./types.js";
+import type { GhPullRequest, GhPRReview, GhPRComment, FetchPullRequestsOptions } from "./types.js";
 
 export async function* fetchPullRequests(
   client: GitHubClient,
@@ -99,6 +99,34 @@ export async function* fetchPRComments(
         created_at: c.created_at,
         updated_at: c.updated_at,
         comment_type: "review_comment",
+      };
+    }
+  }
+}
+
+export async function* fetchPRReviews(
+  client: GitHubClient,
+  owner: string,
+  repo: string,
+  prNumber: number,
+): AsyncGenerator<GhPRReview> {
+  const iter = client.paginate.iterator(client.pulls.listReviews, {
+    owner,
+    repo,
+    pull_number: prNumber,
+    per_page: 100,
+  });
+  for await (const { data } of iter) {
+    for (const r of data) {
+      // PENDING reviews are unsubmitted drafts with no submitted_at
+      if (r.state === "PENDING" || !r.submitted_at) continue;
+      yield {
+        id: r.id,
+        pr_number: prNumber,
+        user_login: r.user?.login ?? "",
+        state: r.state as GhPRReview["state"],
+        body: r.body ?? "",
+        submitted_at: r.submitted_at,
       };
     }
   }
