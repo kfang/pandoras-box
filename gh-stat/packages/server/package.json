@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "ghstat": "./src/index.ts"
+    "ghstat": "./dist/index.js"
   },
   "scripts": {
-    "start": "bun run src/index.ts",
+    "build": "tsc --project tsconfig.json && cp -r src/views dist/views",
+    "docker:build": "docker build -f Dockerfile -t ghstat ../..",
+    "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
@@ -14,11 +16,12 @@
     "@kfang/ghstat-github-data": "workspace:*",
     "@kfang/ghstat-persistence": "workspace:*",
     "@kfang/ghstat-stats": "workspace:*",
+    "fastify": "^5.0.0",
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {
     "typescript": "^5.4.5",
-    "@types/bun": "^1.1.0",
-    "@types/js-yaml": "^4.0.9"
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.0.0"
   }
 }

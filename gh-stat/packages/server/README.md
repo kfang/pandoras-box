@@ -1,10 +1,10 @@
 # @kfang/ghstat-server
 
-Standalone Bun HTTP server for `gh-stat`. Reads a YAML config file, syncs GitHub data into a local SQLite database, and serves a REST API plus an Alpine.js web dashboard.
+Standalone Node.js + Fastify HTTP server for `gh-stat`. Reads a YAML config file, syncs GitHub data into a local SQLite database, and serves a REST API plus an Alpine.js web dashboard.
 
 ## Requirements
 
-- [Bun](https://bun.sh) ≥ 1.0
+- [Node.js](https://nodejs.org) ≥ 22
 - A GitHub personal access token with read access to repositories and pull requests
 
 ## Quick start
@@ -19,11 +19,12 @@ export GITHUB_TOKEN=ghp_...
 # 3. Edit config.yaml to add your orgs/repos
 #    See Configuration section below
 
-# 4. Build dependencies
-bun run build
+# 4. Install dependencies and build
+npm install
+npx nx run-many -t build
 
 # 5. Start the server
-bun run packages/server/src/index.ts
+node packages/server/dist/index.js
 ```
 
 The server starts at `http://localhost:3000`. On startup, a background sync runs immediately (if `refresh.on_start: true`) and then repeats on the configured interval.
@@ -31,7 +32,7 @@ The server starts at `http://localhost:3000`. On startup, a background sync runs
 To use a config file at a different path:
 
 ```bash
-CONFIG_PATH=/etc/gh-stat/config.yaml bun run packages/server/src/index.ts
+CONFIG_PATH=/etc/gh-stat/config.yaml node packages/server/dist/index.js
 ```
 
 ## Configuration
@@ -137,37 +138,43 @@ The dashboard has no build step — Alpine.js is loaded from CDN.
 
 ```bash
 # from repo root
-bun install
+npm install
 
 # build all packages (Nx handles dependency ordering)
-bun run build
+npx nx run-many -t build
 
-# typecheck (server runs directly from source, no emit)
-bunx nx run @kfang/ghstat-server:typecheck
+# typecheck without emitting
+npx nx run @kfang/ghstat-server:typecheck
 
-# run in development (Bun runs TypeScript directly, no build needed)
-CONFIG_PATH=./config.yaml bun run packages/server/src/index.ts
+# start the server
+CONFIG_PATH=./config.yaml node packages/server/dist/index.js
 ```
 
-The server package does not emit compiled output — Bun runs `src/index.ts` directly. HTML view files in `src/views/` are read from disk at request time, so you can edit them without restarting the server.
+HTML view files in `src/views/` are copied to `dist/views/` at build time and read from disk at request time.
 
 ## Docker
 
-```dockerfile
-FROM oven/bun:1 AS base
-WORKDIR /app
+Build the image from the **repo root** (the Dockerfile lives at `packages/server/Dockerfile` but needs the monorepo as its build context):
 
-COPY package.json bun.lock ./
-COPY packages/ ./packages/
-RUN bun install --frozen-lockfile
-
-CMD ["bun", "run", "packages/server/src/index.ts"]
+```bash
+docker build -f packages/server/Dockerfile -t ghstat .
 ```
 
-Mount your `config.yaml` and data directory:
+Mount your `config.yaml` and a data directory for the SQLite database:
 
 ```bash
 docker run \
+  -v $(pwd)/config.yaml:/app/config.yaml \
+  -v $(pwd)/data:/app/data \
+  -p 3000:3000 \
+  ghstat
+```
+
+To pass the GitHub token via environment variable instead of baking it into `config.yaml`:
+
+```bash
+docker run \
+  -e GITHUB_TOKEN=ghp_... \
   -v $(pwd)/config.yaml:/app/config.yaml \
   -v $(pwd)/data:/app/data \
   -p 3000:3000 \

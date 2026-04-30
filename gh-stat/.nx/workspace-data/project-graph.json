@@ -352,6 +352,8 @@
         "metadata": {
           "targetGroups": {
             "NPM Scripts": [
+              "build",
+              "docker:build",
               "start",
               "typecheck",
               "clean"
@@ -363,13 +365,44 @@
           }
         },
         "targets": {
+          "build": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "build"
+            },
+            "metadata": {
+              "scriptContent": "tsc --project tsconfig.json && cp -r src/views dist/views",
+              "runCommand": "bun run build -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true,
+            "dependsOn": [
+              "^build"
+            ],
+            "outputs": [
+              "{projectRoot}/dist"
+            ],
+            "cache": true
+          },
+          "docker:build": {
+            "executor": "nx:run-script",
+            "options": {
+              "script": "docker:build"
+            },
+            "metadata": {
+              "scriptContent": "docker build -f Dockerfile -t ghstat ../..",
+              "runCommand": "bun run docker:build -- undefined"
+            },
+            "configurations": {},
+            "parallelism": true
+          },
           "start": {
             "executor": "nx:run-script",
             "options": {
               "script": "start"
             },
             "metadata": {
-              "scriptContent": "bun run src/index.ts",
+              "scriptContent": "node dist/index.js",
               "runCommand": "bun run start -- undefined"
             },
             "configurations": {},
@@ -569,5 +602,5 @@
   },
   "version": "6.0",
   "errors": [],
-  "computedAt": 1777481950439
+  "computedAt": 1777496214970
 }

@@ -812,6 +812,14 @@
       "packages/server/package.json",
       "nx/core/package-json"
     ],
+    "metadata.targetGroups.NPM Scripts.3": [
+      "packages/server/package.json",
+      "nx/core/package-json"
+    ],
+    "metadata.targetGroups.NPM Scripts.4": [
+      "packages/server/package.json",
+      "nx/core/package-json"
+    ],
     "metadata.js": [
       "packages/server/package.json",
       "nx/core/package-json"
@@ -825,6 +833,62 @@
       "nx/core/package-json"
     ],
     "targets": [
+      "packages/server/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.build": [
+      "packages/server/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.build.executor": [
+      "packages/server/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.build.options": [
+      "packages/server/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.build.metadata": [
+      "packages/server/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.build.options.script": [
+      "packages/server/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.build.metadata.scriptContent": [
+      "packages/server/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.build.metadata.runCommand": [
+      "packages/server/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.docker:build": [
+      "packages/server/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.docker:build.executor": [
+      "packages/server/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.docker:build.options": [
+      "packages/server/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.docker:build.metadata": [
+      "packages/server/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.docker:build.options.script": [
+      "packages/server/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.docker:build.metadata.scriptContent": [
+      "packages/server/package.json",
+      "nx/core/package-json"
+    ],
+    "targets.docker:build.metadata.runCommand": [
       "packages/server/package.json",
       "nx/core/package-json"
     ],
@@ -927,6 +991,22 @@
     "targets.nx-release-publish.options": [
       "packages/server/package.json",
       "nx/core/package-json"
+    ],
+    "targets.build.dependsOn": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.build.outputs": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.build.cache": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.build.parallelism": [
+      "nx.json",
+      "nx/target-defaults"
     ],
     "targets.typecheck.dependsOn": [
       "nx.json",

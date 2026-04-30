@@ -1,12 +1,13 @@
 import { join, dirname } from "path";
-import { readFileSync } from "fs";
+import { readFileSync, mkdirSync } from "fs";
 import { fileURLToPath } from "url";
+import Fastify from "fastify";
 import { createGitHubClient } from "@kfang/ghstat-github-data";
 import { createSqliteProvider, syncAll } from "@kfang/ghstat-persistence";
 import { loadConfig } from "./config.js";
-import { handleRepos } from "./routes/repos.js";
-import { handlePulls } from "./routes/pulls.js";
-import { handleStats } from "./routes/stats.js";
+import { registerRepoRoutes } from "./routes/repos.js";
+import { registerPullRoutes } from "./routes/pulls.js";
+import { registerStatRoutes } from "./routes/stats.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -21,9 +22,7 @@ if (config.persistence.type !== "sqlite") {
 }
 const dbPath = config.persistence.sqlite?.path ?? "./data/gh-stat.db";
 
-// Ensure data directory exists
 const dataDir = dirname(dbPath);
-import { mkdirSync } from "fs";
 mkdirSync(dataDir, { recursive: true });
 
 const storage = createSqliteProvider(dbPath);
@@ -54,57 +53,38 @@ function renderLayout(title: string, content: string): string {
   return layout.replace("{{title}}", title).replace("{{content}}", content);
 }
 
-function serveView(name: string, title: string): Response {
+function serveView(name: string, title: string): string {
   const content = readFileSync(join(__dirname, `views/${name}.html`), "utf8");
-  return new Response(renderLayout(title, content), {
-    headers: { "Content-Type": "text/html; charset=utf-8" },
-  });
+  return renderLayout(title, content);
 }
 
 // ---- Server ----------------------------------------------------------------
-const server = Bun.serve({
-  port: config.server.port,
-  hostname: config.server.host,
+const app = Fastify();
 
-  async fetch(req) {
-    const url = new URL(req.url);
+registerRepoRoutes(app, storage);
+registerPullRoutes(app, storage);
+registerStatRoutes(app, storage);
 
-    // API routes
-    if (url.pathname.startsWith("/api/")) {
-      const reposRes = await handleRepos(req, storage);
-      if (reposRes) return reposRes;
-
-      const pullsRes = await handlePulls(req, storage);
-      if (pullsRes) return pullsRes;
-
-      const statsRes = await handleStats(req, storage);
-      if (statsRes) return statsRes;
-
-      return new Response("Not found", { status: 404 });
-    }
-
-    // POST /api/sync — trigger a manual sync
-    if (url.pathname === "/api/sync" && req.method === "POST") {
-      syncAll(client, storage, config).catch((err) =>
-        console.error("Manual sync error:", err),
-      );
-      return new Response(JSON.stringify({ ok: true, message: "Sync started" }), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    // Frontend views
-    if (url.pathname === "/") {
-      return serveView("index", "Dashboard");
-    }
-
-    if (url.pathname.startsWith("/repo/")) {
-      const repoName = url.pathname.slice("/repo/".length);
-      return serveView("repo", repoName);
-    }
-
-    return new Response("Not found", { status: 404 });
-  },
+app.post("/api/sync", async (_req, reply) => {
+  syncAll(client, storage, config).catch((err) =>
+    console.error("Manual sync error:", err),
+  );
+  return reply.send({ ok: true, message: "Sync started" });
 });
 
-console.log(`gh-stat running at http://${config.server.host}:${server.port}`);
+app.get("/", async (_req, reply) => {
+  return reply.type("text/html").send(serveView("index", "Dashboard"));
+});
+
+app.get("/repo/*", async (req, reply) => {
+  const repoName = (req.params as Record<string, string>)["*"] ?? "";
+  return reply.type("text/html").send(serveView("repo", repoName));
+});
+
+app.listen({ port: config.server.port, host: config.server.host }, (err, address) => {
+  if (err) {
+    console.error(err);
+    process.exit(1);
+  }
+  console.log(`gh-stat running at ${address}`);
+});

@@ -133,8 +133,6 @@ export async function* fetchPRReviews(
   }
 }
 
-const TIMELINE_EVENTS_OF_INTEREST = new Set(["ready_for_review", "convert_to_draft"]);
-
 export async function* fetchPRTimelineEvents(
   client: GitHubClient,
   owner: string,
@@ -151,7 +149,7 @@ export async function* fetchPRTimelineEvents(
     for (const item of data) {
       const event = item as Record<string, unknown>;
       const eventType = event["event"] as string | undefined;
-      if (!eventType || !TIMELINE_EVENTS_OF_INTEREST.has(eventType)) continue;
+      if (!eventType || !event["id"] || !event["created_at"]) continue;
       yield {
         id: event["id"] as number,
         pr_number: prNumber,
