@@ -30,22 +30,29 @@ const storage = createSqliteProvider(dbPath);
 // ---- GitHub client ---------------------------------------------------------
 const client = createGitHubClient(config.github.token);
 
+// ---- Sync state ------------------------------------------------------------
+let syncRunning = false;
+
+function runSync(reason: string): void {
+  if (syncRunning) {
+    console.log(`Sync requested (${reason}) but a sync is already running — skipping.`);
+    return;
+  }
+  syncRunning = true;
+  console.log(`Starting sync (${reason})…`);
+  syncAll(client, storage, config)
+    .catch((err) => console.error("Sync error:", err))
+    .finally(() => { syncRunning = false; });
+}
+
 // ---- Initial sync ----------------------------------------------------------
 if (config.refresh.on_start) {
-  console.log("Starting initial sync…");
-  syncAll(client, storage, config).catch((err) =>
-    console.error("Sync error:", err),
-  );
+  runSync("on_start");
 }
 
 // ---- Scheduled sync --------------------------------------------------------
 const intervalMs = config.refresh.interval * 1000;
-setInterval(() => {
-  console.log("Running scheduled sync…");
-  syncAll(client, storage, config).catch((err) =>
-    console.error("Sync error:", err),
-  );
-}, intervalMs);
+setInterval(() => runSync("scheduled"), intervalMs);
 
 // ---- HTML helpers ----------------------------------------------------------
 function renderLayout(title: string, content: string): string {
@@ -66,9 +73,10 @@ registerPullRoutes(app, storage);
 registerStatRoutes(app, storage);
 
 app.post("/api/sync", async (_req, reply) => {
-  syncAll(client, storage, config).catch((err) =>
-    console.error("Manual sync error:", err),
-  );
+  if (syncRunning) {
+    return reply.status(409).send({ ok: false, message: "A sync is already running" });
+  }
+  runSync("manual");
   return reply.send({ ok: true, message: "Sync started" });
 });
 

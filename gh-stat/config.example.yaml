@@ -4,6 +4,7 @@ github:
     - my-org
   repos:
     - owner/repo
+  lookback_days: 90   # only fetch PRs from the last N days on first sync; omit for all history
 
 persistence:
   type: sqlite        # sqlite | backstage

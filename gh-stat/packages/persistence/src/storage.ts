@@ -149,6 +149,11 @@ export class KnexStorageProvider implements StorageProvider {
         table: pullRequests,
         sql: `ALTER TABLE ${pullRequests} ADD COLUMN ready_for_review_at TEXT`,
       },
+      {
+        version: 8,
+        table: pullRequests,
+        sql: `ALTER TABLE ${pullRequests} ADD COLUMN synced_at TEXT`,
+      },
     ];
   }
 
@@ -421,6 +426,23 @@ export class KnexStorageProvider implements StorageProvider {
       .insert({ repo_full_name: repoFullName, last_sync_time: time.toISOString() })
       .onConflict("repo_full_name")
       .merge();
+  }
+
+  async getPRLastSyncTime(repoFullName: string, prNumber: number): Promise<Date | null> {
+    const db = await this.dbPromise;
+    const row = await db(this.t.pullRequests)
+      .select("synced_at")
+      .where({ repo_full_name: repoFullName, number: prNumber })
+      .first();
+    if (!row || !row["synced_at"]) return null;
+    return new Date(row["synced_at"] as string);
+  }
+
+  async setPRLastSyncTime(repoFullName: string, prNumber: number, time: Date): Promise<void> {
+    const db = await this.dbPromise;
+    await db(this.t.pullRequests)
+      .where({ repo_full_name: repoFullName, number: prNumber })
+      .update({ synced_at: time.toISOString() });
   }
 }
 

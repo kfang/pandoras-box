@@ -46,6 +46,7 @@ github:
     - my-org               # sync all repos in this org
   repos:
     - owner/specific-repo  # sync individual repos (any owner)
+  lookback_days: 90        # only fetch PRs from the last N days on first sync (omit for all history)
 
 persistence:
   type: sqlite

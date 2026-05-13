@@ -6,6 +6,7 @@ export interface Config {
     token: string;
     orgs: string[];
     repos: string[];
+    lookback_days?: number;
   };
   persistence: {
     type: "sqlite" | "backstage";
@@ -47,6 +48,7 @@ export function loadConfig(configPath: string): Config {
       token: (github["token"] as string) ?? "",
       orgs: (github["orgs"] as string[]) ?? [],
       repos: (github["repos"] as string[]) ?? [],
+      lookback_days: github["lookback_days"] as number | undefined,
     },
     persistence: {
       type: (persistence["type"] as "sqlite" | "backstage") ?? "sqlite",

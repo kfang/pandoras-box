@@ -27,4 +27,8 @@ export interface StorageProvider {
   getLastSyncTime(repoFullName: string): Promise<Date | null>;
   /** Record a successful sync timestamp for a repo */
   setLastSyncTime(repoFullName: string, time: Date): Promise<void>;
+  /** Get the timestamp of the last time a specific PR's sub-resources were fully synced */
+  getPRLastSyncTime(repoFullName: string, prNumber: number): Promise<Date | null>;
+  /** Record the time a specific PR's sub-resources were fully synced */
+  setPRLastSyncTime(repoFullName: string, prNumber: number, time: Date): Promise<void>;
 }
