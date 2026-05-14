@@ -1,5 +1,5 @@
 import type { GitHubClient } from "@kfang/ghstat-github-data";
-import { fetchRepo, fetchOrgRepos, fetchPullRequests, fetchPRComments, fetchPRReviews, fetchPRTimelineEvents } from "@kfang/ghstat-github-data";
+import { fetchRepo, fetchOrgRepos, fetchPullRequests, fetchPRComments, fetchPRReviews, fetchPRTimelineEvents, fetchCodeOwnersFile, parseCodeOwners, fetchTeamMembers } from "@kfang/ghstat-github-data";
 import type { StorageProvider } from "./types.js";
 
 export interface SyncConfig {
@@ -161,6 +161,58 @@ export async function syncAll(
       logger.info(`[sync] Finished ${fullName}: ${prCount} PR(s) synced`);
     } catch (err) {
       logger.error(`[sync] Failed to sync ${fullName}`, err);
+    }
+  }
+
+  // Sync CODEOWNERS files and resolve team memberships
+  logger.info("[sync] Syncing CODEOWNERS files…");
+  const teamRefs = new Set<string>(); // "org/team-slug" references
+  for (const fullName of seen) {
+    const [owner, repo] = fullName.split("/");
+    if (!owner || !repo) continue;
+    try {
+      const content = await fetchCodeOwnersFile(client, owner, repo);
+      if (content) {
+        const entries = parseCodeOwners(content);
+        await storage.saveCodeOwnerEntries(fullName, entries);
+        logger.info(`[sync] ${fullName}: ${entries.length} CODEOWNERS entries`);
+        for (const entry of entries) {
+          for (const ownerRef of entry.owners) {
+            // Team references look like @org/team-slug
+            const match = ownerRef.match(/^@([^/]+)\/(.+)$/);
+            if (match) {
+              teamRefs.add(`${match[1]}/${match[2]}`);
+            }
+          }
+        }
+      } else {
+        logger.info(`[sync] ${fullName}: no CODEOWNERS file`);
+      }
+    } catch (err) {
+      logger.error(`[sync] Failed to fetch CODEOWNERS for ${fullName}`, err);
+    }
+  }
+
+  if (teamRefs.size > 0) {
+    logger.info(`[sync] Resolving ${teamRefs.size} team(s) from CODEOWNERS…`);
+    for (const ref of teamRefs) {
+      const [org, teamSlug] = ref.split("/");
+      if (!org || !teamSlug) continue;
+      try {
+        const members: string[] = [];
+        for await (const member of fetchTeamMembers(client, org, teamSlug)) {
+          members.push(member.user_login);
+        }
+        await storage.saveTeamMembers(org, teamSlug, members);
+        logger.info(`[sync] Team ${ref}: ${members.length} member(s)`);
+      } catch (err: unknown) {
+        const status = (err as { status?: number }).status;
+        if (status === 403) {
+          logger.warn(`[sync] Team ${ref}: 403 Forbidden — token may lack read:org scope, skipping`);
+        } else {
+          logger.error(`[sync] Failed to fetch members for team ${ref}`, err);
+        }
+      }
     }
   }
 

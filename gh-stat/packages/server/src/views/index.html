@@ -5,7 +5,7 @@
   <h1>Repository Dashboard</h1>
 
   <!-- Org filter -->
-  <div class="card" style="display:flex;gap:12px;align-items:center;padding:12px 16px;">
+  <div class="card" style="display:flex;gap:12px;align-items:center;padding:12px 16px;flex-wrap:wrap;">
     <label style="font-size:14px;font-weight:600;">Org filter:</label>
     <input
       type="text"
@@ -37,21 +37,69 @@
     </div>
   </div>
 
+  <!-- Code Owner Demand -->
+  <div class="card" x-show="orgStats && orgStats.codeOwnerDemand && orgStats.codeOwnerDemand.groups.length > 0">
+    <h2>Code Owner Demand</h2>
+    <p style="font-size:13px;color:#656d76;margin-bottom:12px;">
+      PRs per engineer across code-owning teams (last 30 days)
+    </p>
+    <div style="padding:0;overflow:hidden;">
+      <table>
+        <thead>
+          <tr>
+            <th>Team</th>
+            <th>Repos</th>
+            <th>PRs Opened</th>
+            <th>Members</th>
+            <th>PRs / Engineer</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="g in orgStats.codeOwnerDemand.groups" :key="g.teamSlug">
+            <tr>
+              <td x-text="g.teamSlug"></td>
+              <td x-text="g.byRepo.length"></td>
+              <td x-text="g.totalPRsOpened"></td>
+              <td x-text="g.memberCount"></td>
+              <td>
+                <span
+                  :class="demandBadgeClass(g.prsPerEngineer)"
+                  x-text="g.prsPerEngineer.toFixed(1)"
+                ></span>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Repo table -->
   <div class="card" style="padding:0;overflow:hidden;">
     <table>
       <thead>
         <tr>
-          <th>Repository</th>
+          <th @click="toggleSort('name')" class="sortable" :class="sortField === 'name' && 'sort-active'">
+            Repository <span x-text="sortIndicator('name')"></span>
+          </th>
           <th>Language</th>
-          <th>Stars</th>
-          <th>Open issues</th>
-          <th>Last push</th>
+          <th @click="toggleSort('pushed_at')" class="sortable" :class="sortField === 'pushed_at' && 'sort-active'">
+            Last push <span x-text="sortIndicator('pushed_at')"></span>
+          </th>
+          <th @click="toggleSort('prs_per_day')" class="sortable" :class="sortField === 'prs_per_day' && 'sort-active'">
+            PRs/day <span x-text="sortIndicator('prs_per_day')"></span>
+          </th>
+          <th @click="toggleSort('prs_per_week')" class="sortable" :class="sortField === 'prs_per_week' && 'sort-active'">
+            PRs/wk <span x-text="sortIndicator('prs_per_week')"></span>
+          </th>
+          <th @click="toggleSort('familiarity')" class="sortable" :class="sortField === 'familiarity' && 'sort-active'">
+            Familiarity <span x-text="sortIndicator('familiarity')"></span>
+          </th>
           <th>Status</th>
         </tr>
       </thead>
       <tbody>
-        <template x-for="repo in repos" :key="repo.full_name">
+        <template x-for="repo in sortedRepos" :key="repo.full_name">
           <tr>
             <td>
               <a :href="'/repo/' + repo.full_name" x-text="repo.full_name"></a>
@@ -64,9 +112,18 @@
               ></span>
               <span x-show="!repo.language" style="color:#656d76;">—</span>
             </td>
-            <td x-text="repo.stargazers_count.toLocaleString()"></td>
-            <td x-text="repo.open_issues_count.toLocaleString()"></td>
             <td x-text="formatDate(repo.pushed_at)"></td>
+            <td x-text="repo._summary ? repo._summary.avgPRsPerDay.toFixed(2) : '—'"></td>
+            <td x-text="repo._summary ? repo._summary.avgPRsPerWeek.toFixed(1) : '—'"></td>
+            <td>
+              <template x-if="repo._summary && repo._summary.maxFamiliarityPct !== null">
+                <span
+                  :class="repo._summary.maxFamiliarityPct >= 70 ? 'badge badge-green' : repo._summary.maxFamiliarityPct >= 40 ? 'badge badge-yellow' : 'badge badge-red'"
+                  x-text="repo._summary.maxFamiliarityPct.toFixed(0) + '%'"
+                ></span>
+              </template>
+              <span x-show="!repo._summary || repo._summary.maxFamiliarityPct === null" style="color:#656d76;">—</span>
+            </td>
             <td>
               <span
                 :class="repo.archived ? 'badge badge-gray' : staleDays(repo.pushed_at) >= 90 ? 'badge badge-yellow' : 'badge badge-green'"
@@ -76,15 +133,21 @@
           </tr>
         </template>
         <tr x-show="repos.length === 0 && !loading">
-          <td colspan="6" style="text-align:center;color:#656d76;padding:24px;">No repos found.</td>
+          <td colspan="7" style="text-align:center;color:#656d76;padding:24px;">No repos found.</td>
         </tr>
         <tr x-show="loading">
-          <td colspan="6" style="text-align:center;color:#656d76;padding:24px;">Loading…</td>
+          <td colspan="7" style="text-align:center;color:#656d76;padding:24px;">Loading…</td>
         </tr>
       </tbody>
     </table>
   </div>
 </div>
+
+<style>
+  th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+  th.sortable:hover { background: #eaeef2; }
+  th.sort-active { color: #0969da; }
+</style>
 
 <script>
 function dashboard() {
@@ -93,6 +156,8 @@ function dashboard() {
     orgStats: null,
     orgFilter: '',
     loading: false,
+    sortField: 'pushed_at',
+    sortDir: 'desc',
 
     async init() {
       await this.loadRepos();
@@ -108,11 +173,71 @@ function dashboard() {
 
       if (this.orgFilter) {
         const statsRes = await fetch(`/api/stats/org/${encodeURIComponent(this.orgFilter)}`);
-        if (statsRes.ok) this.orgStats = await statsRes.json();
+        if (statsRes.ok) {
+          this.orgStats = await statsRes.json();
+          this.mergeSummaries();
+        }
       } else {
         this.orgStats = null;
       }
       this.loading = false;
+    },
+
+    mergeSummaries() {
+      if (!this.orgStats?.repoSummaries) return;
+      const byName = new Map();
+      for (const s of this.orgStats.repoSummaries) {
+        byName.set(s.repoFullName, s);
+      }
+      for (const repo of this.repos) {
+        repo._summary = byName.get(repo.full_name) || null;
+      }
+    },
+
+    get sortedRepos() {
+      const field = this.sortField;
+      const dir = this.sortDir === 'asc' ? 1 : -1;
+      return [...this.repos].sort((a, b) => {
+        let va, vb;
+        switch (field) {
+          case 'name':
+            va = a.full_name.toLowerCase();
+            vb = b.full_name.toLowerCase();
+            return va < vb ? -dir : va > vb ? dir : 0;
+          case 'pushed_at':
+            va = new Date(a.pushed_at).getTime();
+            vb = new Date(b.pushed_at).getTime();
+            return (va - vb) * dir;
+          case 'prs_per_day':
+            va = a._summary?.avgPRsPerDay ?? -1;
+            vb = b._summary?.avgPRsPerDay ?? -1;
+            return (va - vb) * dir;
+          case 'prs_per_week':
+            va = a._summary?.avgPRsPerWeek ?? -1;
+            vb = b._summary?.avgPRsPerWeek ?? -1;
+            return (va - vb) * dir;
+          case 'familiarity':
+            va = a._summary?.maxFamiliarityPct ?? -1;
+            vb = b._summary?.maxFamiliarityPct ?? -1;
+            return (va - vb) * dir;
+          default:
+            return 0;
+        }
+      });
+    },
+
+    toggleSort(field) {
+      if (this.sortField === field) {
+        this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        this.sortField = field;
+        this.sortDir = field === 'name' ? 'asc' : 'desc';
+      }
+    },
+
+    sortIndicator(field) {
+      if (this.sortField !== field) return '';
+      return this.sortDir === 'asc' ? '\u25B2' : '\u25BC';
     },
 
     formatDate(iso) {
@@ -122,6 +247,12 @@ function dashboard() {
 
     staleDays(pushedAt) {
       return Math.floor((Date.now() - new Date(pushedAt).getTime()) / (86400 * 1000));
+    },
+
+    demandBadgeClass(prsPerEngineer) {
+      if (prsPerEngineer > 3) return 'badge badge-red';
+      if (prsPerEngineer > 1.5) return 'badge badge-yellow';
+      return 'badge badge-green';
     },
   };
 }

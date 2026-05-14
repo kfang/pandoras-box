@@ -74,3 +74,16 @@ export interface GhPRComment {
   /** "issue_comment" = top-level PR thread comment; "review_comment" = inline code comment */
   comment_type: "issue_comment" | "review_comment";
 }
+
+export interface GhCodeOwnerEntry {
+  /** File path pattern from CODEOWNERS, e.g. "*.ts", "src/backend/", "*" */
+  pattern: string;
+  /** Owner references, e.g. ["@org/platform-team", "@username"] */
+  owners: string[];
+}
+
+export interface GhTeamMember {
+  org: string;
+  team_slug: string;
+  user_login: string;
+}

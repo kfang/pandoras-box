@@ -1,5 +1,5 @@
 import knex, { type Knex } from "knex";
-import type { StorageProvider, GhRepo, GhPullRequest, GhPRReview, GhPRComment, GhPRTimelineEvent } from "./types.js";
+import type { StorageProvider, GhRepo, GhPullRequest, GhPRReview, GhPRComment, GhPRTimelineEvent, GhCodeOwnerEntry, GhTeamMember } from "./types.js";
 
 interface Migration {
   version: number;
@@ -20,6 +20,8 @@ interface TableNames {
   prComments: string;
   prReviews: string;
   prTimelineEvents: string;
+  codeownerEntries: string;
+  teamMembers: string;
   migrations: string;
 }
 
@@ -31,6 +33,8 @@ function withPrefix(p: string): TableNames {
     prComments: `${p}pr_comments`,
     prReviews: `${p}pr_reviews`,
     prTimelineEvents: `${p}pr_timeline_events`,
+    codeownerEntries: `${p}codeowner_entries`,
+    teamMembers: `${p}team_members`,
     migrations: `${p}schema_migrations`,
   };
 }
@@ -45,7 +49,7 @@ export class KnexStorageProvider implements StorageProvider {
   }
 
   private buildMigrations(): ReadonlyArray<Migration> {
-    const { repos, pullRequests, syncState, prComments, prReviews, prTimelineEvents } = this.t;
+    const { repos, pullRequests, syncState, prComments, prReviews, prTimelineEvents, codeownerEntries, teamMembers } = this.t;
     return [
       {
         version: 1,
@@ -153,6 +157,26 @@ export class KnexStorageProvider implements StorageProvider {
         version: 8,
         table: pullRequests,
         sql: `ALTER TABLE ${pullRequests} ADD COLUMN synced_at TEXT`,
+      },
+      {
+        version: 9,
+        table: codeownerEntries,
+        sql: `CREATE TABLE ${codeownerEntries} (
+          repo_full_name TEXT NOT NULL,
+          pattern TEXT NOT NULL,
+          owners TEXT NOT NULL,
+          PRIMARY KEY (repo_full_name, pattern)
+        )`,
+      },
+      {
+        version: 10,
+        table: teamMembers,
+        sql: `CREATE TABLE ${teamMembers} (
+          org TEXT NOT NULL,
+          team_slug TEXT NOT NULL,
+          user_login TEXT NOT NULL,
+          PRIMARY KEY (org, team_slug, user_login)
+        )`,
       },
     ];
   }
@@ -443,6 +467,66 @@ export class KnexStorageProvider implements StorageProvider {
     await db(this.t.pullRequests)
       .where({ repo_full_name: repoFullName, number: prNumber })
       .update({ synced_at: time.toISOString() });
+  }
+
+  async saveCodeOwnerEntries(repoFullName: string, entries: GhCodeOwnerEntry[]): Promise<void> {
+    const db = await this.dbPromise;
+    await db.transaction(async (trx) => {
+      await trx(this.t.codeownerEntries).where({ repo_full_name: repoFullName }).delete();
+      if (entries.length > 0) {
+        await trx(this.t.codeownerEntries).insert(
+          entries.map((e) => ({
+            repo_full_name: repoFullName,
+            pattern: e.pattern,
+            owners: JSON.stringify(e.owners),
+          })),
+        );
+      }
+    });
+  }
+
+  async getCodeOwnerEntries(repoFullName?: string): Promise<Array<GhCodeOwnerEntry & { repo_full_name: string }>> {
+    const db = await this.dbPromise;
+    let query = db(this.t.codeownerEntries).select("*");
+    if (repoFullName) {
+      query = query.where({ repo_full_name: repoFullName });
+    }
+    const rows = (await query) as unknown as Record<string, unknown>[];
+    return rows.map((row) => ({
+      repo_full_name: row["repo_full_name"] as string,
+      pattern: row["pattern"] as string,
+      owners: JSON.parse(row["owners"] as string) as string[],
+    }));
+  }
+
+  async saveTeamMembers(org: string, teamSlug: string, members: string[]): Promise<void> {
+    const db = await this.dbPromise;
+    await db.transaction(async (trx) => {
+      await trx(this.t.teamMembers).where({ org, team_slug: teamSlug }).delete();
+      if (members.length > 0) {
+        await trx(this.t.teamMembers).insert(
+          members.map((login) => ({ org, team_slug: teamSlug, user_login: login })),
+        );
+      }
+    });
+  }
+
+  async getTeamMembers(org: string, teamSlug: string): Promise<string[]> {
+    const db = await this.dbPromise;
+    const rows = (await db(this.t.teamMembers)
+      .select("user_login")
+      .where({ org, team_slug: teamSlug })) as unknown as Record<string, unknown>[];
+    return rows.map((row) => row["user_login"] as string);
+  }
+
+  async getAllTeamMembers(): Promise<GhTeamMember[]> {
+    const db = await this.dbPromise;
+    const rows = (await db(this.t.teamMembers).select("*")) as unknown as Record<string, unknown>[];
+    return rows.map((row) => ({
+      org: row["org"] as string,
+      team_slug: row["team_slug"] as string,
+      user_login: row["user_login"] as string,
+    }));
   }
 }
 

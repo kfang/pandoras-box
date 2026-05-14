@@ -7,6 +7,17 @@
   </div>
   <h1 x-text="fullName"></h1>
 
+  <!-- Time window controls -->
+  <div class="card" style="display:flex;gap:12px;align-items:center;padding:12px 16px;flex-wrap:wrap;">
+    <label style="font-size:14px;font-weight:600;">Time window:</label>
+    <input type="date" x-model="sinceDate" @change="reload()"
+      style="border:1px solid #d0d7de;border-radius:6px;padding:6px 10px;font-size:14px;" />
+    <span style="font-size:13px;color:#656d76;">to</span>
+    <input type="date" x-model="untilDate" @change="reload()"
+      style="border:1px solid #d0d7de;border-radius:6px;padding:6px 10px;font-size:14px;" />
+    <span style="font-size:13px;color:#656d76;" x-text="'(' + (stats?.repoDemand?.daysInWindow ?? 0) + ' days)'"></span>
+  </div>
+
   <template x-if="stats">
     <div>
       <!-- Health row -->
@@ -34,6 +45,25 @@
         <div class="card stat">
           <div class="value" x-text="stats.contributors.uniqueContributors"></div>
           <div class="label">Contributors</div>
+        </div>
+      </div>
+
+      <!-- Repo Demand -->
+      <div class="card" x-show="stats.repoDemand">
+        <h2>Repo Demand</h2>
+        <div class="grid" style="margin-top:12px;">
+          <div class="stat">
+            <div class="value" x-text="stats.repoDemand.avgPRsPerDay"></div>
+            <div class="label">PRs / day</div>
+          </div>
+          <div class="stat">
+            <div class="value" x-text="stats.repoDemand.avgPRsPerWeek"></div>
+            <div class="label">PRs / week</div>
+          </div>
+          <div class="stat">
+            <div class="value" x-text="stats.repoDemand.totalPRsOpened"></div>
+            <div class="label">PRs opened in window</div>
+          </div>
         </div>
       </div>
 
@@ -85,6 +115,92 @@
           </tbody>
         </table>
       </div>
+
+      <!-- Engineer Review Percentage -->
+      <div class="card" x-show="stats.engineerReviewPct && stats.engineerReviewPct.engineers.length > 0">
+        <h2>Engineer Review Percentage</h2>
+        <p style="font-size:13px;color:#656d76;margin-bottom:12px;">
+          Out of <strong x-text="stats.engineerReviewPct.totalPRsInWindow"></strong> PRs in window
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Reviewer</th>
+              <th>PRs Reviewed</th>
+              <th>Review %</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="e in stats.engineerReviewPct.engineers" :key="e.login">
+              <tr>
+                <td x-text="e.login"></td>
+                <td x-text="e.uniquePRsReviewed"></td>
+                <td x-text="e.reviewPctOfAllPRs.toFixed(1) + '%'"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Reviewer Familiarity -->
+      <div class="card" x-show="stats.reviewerFamiliarity">
+        <h2>Reviewer Familiarity</h2>
+        <template x-if="stats.reviewerFamiliarity.groupFamiliarity.length === 0">
+          <p style="font-size:13px;color:#656d76;">No CODEOWNERS file found for this repo.</p>
+        </template>
+        <template x-if="stats.reviewerFamiliarity.groupFamiliarity.length > 0">
+          <div>
+            <!-- Group-level familiarity -->
+            <div class="grid" style="margin-bottom:16px;">
+              <template x-for="g in stats.reviewerFamiliarity.groupFamiliarity" :key="g.teamSlug">
+                <div class="card stat" style="margin-bottom:0;">
+                  <div class="value">
+                    <span
+                      :class="g.familiarityPct >= 70 ? 'badge badge-green' : g.familiarityPct >= 40 ? 'badge badge-yellow' : 'badge badge-red'"
+                      style="font-size:24px;"
+                      x-text="g.familiarityPct.toFixed(0) + '%'"
+                    ></span>
+                  </div>
+                  <div class="label" x-text="g.teamSlug"></div>
+                  <div class="label" x-text="g.membersWithRecentPR + '/' + g.totalMembers + ' members with recent PRs'"></div>
+                </div>
+              </template>
+            </div>
+
+            <!-- Individual-level familiarity -->
+            <template x-if="stats.reviewerFamiliarity.individualFamiliarity.length > 0">
+              <div>
+                <h2 style="font-size:15px;margin-top:8px;">Individual Familiarity</h2>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Engineer</th>
+                      <th>Recent PRs</th>
+                      <th>Last PR</th>
+                      <th>Familiar?</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="i in stats.reviewerFamiliarity.individualFamiliarity" :key="i.login">
+                      <tr>
+                        <td x-text="i.login"></td>
+                        <td x-text="i.recentPRCount"></td>
+                        <td x-text="i.lastPRDate ? new Date(i.lastPRDate).toLocaleDateString() : '—'"></td>
+                        <td>
+                          <span
+                            :class="i.hasRecentPR ? 'badge badge-green' : 'badge badge-red'"
+                            x-text="i.hasRecentPR ? 'Yes' : 'No'"
+                          ></span>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
     </div>
   </template>
 
@@ -94,15 +210,28 @@
 
 <script>
 function repoPage() {
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   return {
     fullName: location.pathname.replace('/repo/', ''),
     stats: null,
     loading: false,
     error: null,
+    sinceDate: thirtyDaysAgo.toISOString().split('T')[0],
+    untilDate: now.toISOString().split('T')[0],
 
     async init() {
+      await this.reload();
+    },
+
+    async reload() {
       this.loading = true;
-      const res = await fetch(`/api/stats/${this.fullName}`);
+      this.error = null;
+      const params = new URLSearchParams();
+      if (this.sinceDate) params.set('since', this.sinceDate);
+      if (this.untilDate) params.set('until', this.untilDate);
+      const qs = params.toString();
+      const res = await fetch(`/api/stats/${this.fullName}${qs ? '?' + qs : ''}`);
       if (!res.ok) {
         this.error = 'Failed to load stats for ' + this.fullName;
       } else {

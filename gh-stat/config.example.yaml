@@ -5,6 +5,8 @@ github:
   repos:
     - owner/repo
   lookback_days: 90   # only fetch PRs from the last N days on first sync; omit for all history
+  # CODEOWNERS files are parsed automatically from each repo's .github/CODEOWNERS
+  # Team members are resolved via the GitHub Teams API (requires read:org token scope)
 
 persistence:
   type: sqlite        # sqlite | backstage

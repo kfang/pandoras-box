@@ -1,6 +1,6 @@
-import type { GhRepo, GhPullRequest, GhPRReview, GhPRComment, GhPRTimelineEvent } from "@kfang/ghstat-github-data";
+import type { GhRepo, GhPullRequest, GhPRReview, GhPRComment, GhPRTimelineEvent, GhCodeOwnerEntry, GhTeamMember } from "@kfang/ghstat-github-data";
 
-export type { GhRepo, GhPullRequest, GhPRReview, GhPRComment, GhPRTimelineEvent };
+export type { GhRepo, GhPullRequest, GhPRReview, GhPRComment, GhPRTimelineEvent, GhCodeOwnerEntry, GhTeamMember };
 
 export interface StorageProvider {
   /** Upsert a repo record */
@@ -31,4 +31,14 @@ export interface StorageProvider {
   getPRLastSyncTime(repoFullName: string, prNumber: number): Promise<Date | null>;
   /** Record the time a specific PR's sub-resources were fully synced */
   setPRLastSyncTime(repoFullName: string, prNumber: number, time: Date): Promise<void>;
+  /** Replace all CODEOWNERS entries for a repo */
+  saveCodeOwnerEntries(repoFullName: string, entries: GhCodeOwnerEntry[]): Promise<void>;
+  /** Get CODEOWNERS entries, optionally filtered by repo */
+  getCodeOwnerEntries(repoFullName?: string): Promise<Array<GhCodeOwnerEntry & { repo_full_name: string }>>;
+  /** Replace all members for a team */
+  saveTeamMembers(org: string, teamSlug: string, members: string[]): Promise<void>;
+  /** Get member logins for a specific team */
+  getTeamMembers(org: string, teamSlug: string): Promise<string[]>;
+  /** Get all team memberships */
+  getAllTeamMembers(): Promise<GhTeamMember[]>;
 }
