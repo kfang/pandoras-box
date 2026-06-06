@@ -1,0 +1,19 @@
+server:
+  port: 3000
+  host: "0.0.0.0"
+
+db:
+  provider: sqlite
+  sqlite:
+    path: /data/synago.db
+  postgres:
+    url: ~
+
+auth:
+  secret: ~
+  url: "http://localhost:3000"
+
+log:
+  level: info
+
+data_dir: /data

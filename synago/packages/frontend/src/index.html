@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>synago</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="app" x-data="app()">
+    <nav class="nav">
+      <h1 class="nav-title">synago</h1>
+      <div class="nav-links">
+        <a href="#" @click.prevent="view = 'songs'" :class="{ active: view === 'songs' }">Songs</a>
+        <a href="#" @click.prevent="view = 'settings'" :class="{ active: view === 'settings' }">Settings</a>
+      </div>
+    </nav>
+
+    <main class="main">
+      <div x-show="view === 'songs'">
+        <div class="toolbar">
+          <h2>Songs</h2>
+          <button @click="showAddForm = true" class="btn btn-primary">+ Add Song</button>
+        </div>
+
+        <div x-show="showAddForm" class="card">
+          <form @submit.prevent="addSong">
+            <div class="form-group">
+              <label>Title</label>
+              <input type="text" x-model="form.title" required>
+            </div>
+            <div class="form-group">
+              <label>Artist</label>
+              <input type="text" x-model="form.artist">
+            </div>
+            <div class="form-group">
+              <label>Format</label>
+              <select x-model="form.format">
+                <option value="chordpro">ChordPro</option>
+                <option value="opensong">OpenSong</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Content</label>
+              <textarea x-model="form.content" rows="10" required></textarea>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Save</button>
+              <button type="button" @click="showAddForm = false" class="btn">Cancel</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="song-list">
+          <template x-for="song in songs" :key="song.id">
+            <div class="song-card" @click="selectSong(song)">
+              <h3 x-text="song.title"></h3>
+              <p x-text="song.artist" class="artist"></p>
+            </div>
+          </template>
+          <p x-show="songs.length === 0" class="empty-state">No songs yet. Add one!</p>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="/js/main.js"></script>
+</body>
+</html>

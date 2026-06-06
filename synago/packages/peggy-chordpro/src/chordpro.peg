@@ -1,0 +1,44 @@
+{
+  // Basic ChordPro chord/lyric format parser
+  // Reference: https://www.chordpro.org/
+}
+
+Song = Newline* directives:Directive* body:Paragraph* {
+  return { type: "song", directives, body }
+}
+
+Directive = "{" key:DirectiveKey value:DirectiveValue? "}" Newline? {
+  const v = value ?? ""
+  const trimmed = v.startsWith(":") ? v.slice(1).trim() : v.trim()
+  return { key: key.toLowerCase(), value: trimmed }
+}
+
+DirectiveKey = [a-zA-Z_]+ { return text() }
+
+DirectiveValue = rest:$[^}]+ { return rest }
+
+Paragraph = Newline* heading:SectionHeading? lines:Line+ {
+  return { type: heading ?? "verse", lines }
+}
+
+SectionHeading = "{start_of_" label:$[a-zA-Z]+ "}" Newline? {
+  return label
+}
+
+Line = parts:InlinePart+ Newline? {
+  return { parts }
+}
+
+InlinePart = chord:ChordInline text:TextInline? {
+  return { chord: chord ?? null, text: text ?? "" }
+}
+
+ChordInline = "[" chord:$(ch:(!"]".)*) "]" {
+  return chord
+}
+
+TextInline = text:$[^\n[]+ {
+  return text.trimEnd()
+}
+
+Newline = "\n" / "\r\n"

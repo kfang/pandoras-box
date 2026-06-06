@@ -1,0 +1,36 @@
+{
+  "name": "synago",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "test:dev": "turbo run test -- --watch",
+    "lint": "eslint packages/ --ext .ts",
+    "typecheck": "turbo run typecheck",
+    "format": "prettier --write \"packages/**/*.ts\"",
+    "format:check": "prettier --check \"packages/**/*.ts\"",
+    "dev:backend": "tsx watch packages/backend/src/server.ts",
+    "dev:front": "esbuild packages/frontend/src/main.ts --bundle --outdir=packages/backend/public/js --watch"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.28.0",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^10.0.0",
+    "prettier": "^3.5.0",
+    "tsx": "^4.19.0",
+    "turbo": "^2.9.0",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.0.0"
+  },
+  "packageManager": "pnpm@10.9.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "protobufjs"
+    ],
+    "onlyBuiltDependenciesFile": ""
+  }
+}

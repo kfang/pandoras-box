@@ -1,0 +1,40 @@
+{
+  // Basic OpenSong chord/lyric format parser
+  // Reference: http://www.opensong.org/
+}
+
+Song = header:HeaderSection* body:BodySection? {
+  return { type: "song", header, body: body ?? [] }
+}
+
+HeaderSection = "[" key:HeaderKey "]" value:HeaderValue Newline? {
+  return { key: key.toLowerCase(), value: value.trim() }
+}
+
+HeaderKey "header key" = [a-zA-Z_]+ { return text() }
+
+HeaderValue = chars:$[^\n]+ { return chars }
+
+BodySection = Newline* sections:Section+ {
+  return sections
+}
+
+Section "section" = heading:SectionHeading lines:ContentLine+ {
+  return { type: heading ?? "verse", lines }
+}
+
+SectionHeading = "[" label:$[a-zA-Z0-9_ ]+ "]" Newline {
+  return label.trim().toLowerCase()
+}
+
+ContentLine = parts:InlineChord+ Newline {
+  return { parts }
+}
+
+InlineChord = "[" chord:$(ch:(!"]".)*) "]" text:LyricPart? {
+  return { chord: chord ?? "", text: text ?? "" }
+}
+
+LyricPart = $[^\n[]*
+
+Newline = "\n" / "\r\n"

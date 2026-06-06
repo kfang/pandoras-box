@@ -1,0 +1,15 @@
+{
+  "name": "@synago/peggy-chordpro",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "peggy -o src/generated.ts src/chordpro.peg",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "peggy": "^4.2.0",
+    "vitest": "^3.1.0"
+  }
+}

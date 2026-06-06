@@ -1,0 +1,14 @@
+{
+  "name": "@synago/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/main.ts",
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --outdir=../backend/public/js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@synago/common": "workspace:*"
+  }
+}
