@@ -503,6 +503,19 @@
       background: #4a90d9;
       border-color: #4a90d9;
     }
+
+    .saving-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      color: white;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -542,6 +555,8 @@
             <button @click="selectAll()">Select All</button>
             <button @click="selectNone()">Select None</button>
             <button @click="selecting = false; selected.clear()">Cancel</button>
+            <button @click="download('raw')" :disabled="selected.size === 0">Download RAW</button>
+            <button @click="download('jpeg')" :disabled="selected.size === 0">Download JPEG</button>
             <button class="trash-btn" @click="trashSelected()" :disabled="selected.size === 0">Trash</button>
           </div>
         </template>
@@ -745,6 +760,9 @@
           <button @click="viewerBack()">&larr; Back</button>
           <span class="vw-name" x-text="viewerFile.split('/').pop()"></span>
           <span class="type-badge" :class="fileType(viewerFile).type" x-text="fileType(viewerFile).label" style="position:static;"></span>
+          <button @click="rotate(90)" :disabled="isVideo(viewerFile)">↻ 90°</button>
+          <button @click="rotate(270)" :disabled="isVideo(viewerFile)">↺ 90°</button>
+          <button @click="save()" :disabled="viewerRotation === 0 || saving" style="font-weight:600;" x-show="viewerRotation !== 0">Save</button>
           <div class="vw-nav">
             <button @click="viewerPrev()" :disabled="viewerIndex <= 0">&lsaquo; Prev</button>
             <button @click="viewerNext()" :disabled="viewerIndex >= viewerSiblings.length - 1">Next &rsaquo;</button>
@@ -755,12 +773,15 @@
             <video :src="'/api/file/' + viewerFile" controls autoplay></video>
           </template>
           <template x-if="isRaw(viewerFile)">
-            <img :src="'/api/preview/' + viewerFile" />
+            <img :src="'/api/preview/' + viewerFile + '?_=' + viewerTS" :style="'transform: rotate(' + viewerRotation + 'deg)'" />
           </template>
           <template x-if="!isVideo(viewerFile) && !isRaw(viewerFile)">
-            <img :src="'/api/file/' + viewerFile" />
+            <img :src="'/api/file/' + viewerFile + '?_=' + viewerTS" :style="'transform: rotate(' + viewerRotation + 'deg)'" />
           </template>
         </div>
+        <template x-if="saving">
+          <div class="saving-overlay">Saving…</div>
+        </template>
       </div>
     </template>
   </div>
@@ -808,6 +829,9 @@
         viewerFile: "",
         viewerSiblings: [],
         viewerReturnHash: "",
+        viewerTS: Date.now(),
+        viewerRotation: 0,
+        saving: false,
         trashPath: "",
         trashEntries: [],
         trashSelecting: false,
@@ -933,6 +957,7 @@
               })
               .catch(() => { this.viewerSiblings = [file]; });
           }
+          this.viewerRotation = 0;
           this.view = "viewer";
           this.updateHash();
         },
@@ -944,6 +969,7 @@
         viewerPrev() {
           if (this.viewerIndex > 0) {
             this.viewerFile = this.viewerSiblings[this.viewerIndex - 1];
+            this.viewerRotation = 0;
             this.updateHash();
           }
         },
@@ -951,6 +977,7 @@
         viewerNext() {
           if (this.viewerIndex < this.viewerSiblings.length - 1) {
             this.viewerFile = this.viewerSiblings[this.viewerIndex + 1];
+            this.viewerRotation = 0;
             this.updateHash();
           }
         },
@@ -1326,6 +1353,52 @@
             name,
             path: parts.slice(0, i + 1).join("/"),
           }));
+        },
+
+        rotate(angle) {
+          this.viewerRotation = (this.viewerRotation + angle) % 360;
+        },
+
+        async save() {
+          const angle = this.viewerRotation;
+          if (angle === 0) return;
+          this.saving = true;
+          const res = await fetch("/api/rotate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ file: this.viewerFile, angle }),
+          });
+          if (res.ok) {
+            this.viewerRotation = 0;
+            this.viewerTS = Date.now();
+          } else {
+            const text = await res.text();
+            console.error("rotate failed:", res.status, text);
+          }
+          this.saving = false;
+        },
+
+        async download(format) {
+          if (this.selected.size === 0) return;
+          const files = [...this.selected];
+          try {
+            const res = await fetch("/api/download", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ files, format }),
+            });
+            if (res.ok) {
+              const blob = await res.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "mnemosyne-" + format + ".zip";
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }
+          } catch {}
         },
 
         connectWs() {

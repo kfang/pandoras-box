@@ -57,12 +57,19 @@ func Generate(srcPath, thumbDir string) {
 	// For RAW files, extract the embedded preview first
 	if rawExtensions[ext] {
 		hash := fmt.Sprintf("%x", sha256.Sum256([]byte(srcPath)))
-		previewPath := filepath.Join(thumbDir, hash[:16]+"_preview.jpg")
-		if err := metadata.ExtractPreview(srcPath, previewPath); err == nil {
-			srcPath = previewPath
+		// Use existing rotated preview if available
+		previewDir := filepath.Join(filepath.Dir(thumbDir), ".previews")
+		cachedPreview := filepath.Join(previewDir, hash[:16]+"_full.jpg")
+		if _, err := os.Stat(cachedPreview); err == nil {
+			srcPath = cachedPreview
 		} else {
-			log.Printf("no embedded preview in %s, skipping thumbnail: %v", srcPath, err)
-			return
+			previewPath := filepath.Join(thumbDir, hash[:16]+"_preview.jpg")
+			if err := metadata.ExtractPreview(srcPath, previewPath); err == nil {
+				srcPath = previewPath
+			} else {
+				log.Printf("no embedded preview in %s, skipping thumbnail: %v", srcPath, err)
+				return
+			}
 		}
 	}
 

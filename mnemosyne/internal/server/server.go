@@ -1,13 +1,18 @@
 package server
 
 import (
+	"archive/zip"
 	"encoding/json"
+	"fmt"
 	"image"
 	"image/jpeg"
+	"image/png"
+	"io"
 	"log"
 	"math/bits"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -17,6 +22,7 @@ import (
 	"github.com/kfang/mnemosyne/internal/metadata"
 	"github.com/kfang/mnemosyne/internal/thumbnail"
 	"golang.org/x/image/draw"
+	_ "golang.org/x/image/webp"
 )
 
 var upgrader = websocket.Upgrader{
@@ -51,6 +57,8 @@ func New(addr, libraryDir string, imp *importer.Importer, scanFn ScanFunc) *Serv
 	mux.HandleFunc("/api/trash", s.handleTrash)
 	mux.HandleFunc("/api/trash/empty", s.handleEmptyTrash)
 	mux.HandleFunc("/api/trash/restore", s.handleRestore)
+	mux.HandleFunc("/api/rotate", s.handleRotate)
+	mux.HandleFunc("/api/download", s.handleDownload)
 	mux.HandleFunc("/ws", s.handleWebSocket)
 	mux.Handle("/", http.FileServer(http.Dir("web")))
 
@@ -155,10 +163,37 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "preview not available", http.StatusNotFound)
 			return
 		}
+		// Apply RAW orientation so the preview reflects the file's current EXIF state
+		if angle := readOrientation(filePath); angle > 0 {
+			if err := rotateFile(previewPath, angle); err != nil {
+				log.Printf("failed to apply orientation to preview %s: %v", previewPath, err)
+			}
+		}
 	}
 
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	http.ServeFile(w, r, previewPath)
+}
+
+// readOrientation reads the EXIF Orientation from a RAW file via exiftool
+// and returns the corresponding rotation angle in degrees (0, 90, 180, 270).
+func readOrientation(path string) int {
+	out, err := exec.Command("exiftool", "-n", "-Orientation", "-b", path).Output()
+	if err != nil || len(out) == 0 {
+		return 0
+	}
+	val := 0
+	fmt.Sscanf(string(out), "%d", &val)
+	switch val {
+	case 3:
+		return 180
+	case 6:
+		return 90
+	case 8:
+		return 270
+	default:
+		return 0
+	}
 }
 
 func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
@@ -290,6 +325,18 @@ var mediaExtensions = map[string]bool{
 	".cr2": true, ".cr3": true, ".nef": true, ".arw": true,
 	".raf": true, ".orf": true, ".rw2": true, ".dng": true,
 	".pef": true, ".srw": true, ".x3f": true, ".iiq": true,
+	".mov": true, ".mp4": true, ".avi": true, ".mkv": true,
+	".mts": true, ".m2ts": true, ".wmv": true, ".webm": true,
+	".m4v": true,
+}
+
+var rawExtensions = map[string]bool{
+	".cr2": true, ".cr3": true, ".nef": true, ".arw": true,
+	".raf": true, ".orf": true, ".rw2": true, ".dng": true,
+	".pef": true, ".srw": true, ".x3f": true, ".iiq": true,
+}
+
+var videoExtensions = map[string]bool{
 	".mov": true, ".mp4": true, ".avi": true, ".mkv": true,
 	".mts": true, ".m2ts": true, ".wmv": true, ".webm": true,
 	".m4v": true,
@@ -437,6 +484,224 @@ func removeEmptyParents(dir, stopAt string) {
 		os.Remove(dir)
 		dir = filepath.Dir(dir)
 	}
+}
+
+func (s *Server) handleRotate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		File  string `json:"file"`
+		Angle int    `json:"angle"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Angle != 90 && req.Angle != 180 && req.Angle != 270 {
+		http.Error(w, "angle must be 90, 180, or 270", http.StatusBadRequest)
+		return
+	}
+
+	filePath := filepath.Join(s.libraryDir, filepath.Clean("/"+req.File))
+	if !strings.HasPrefix(filePath, s.libraryDir) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	ext := strings.ToLower(filepath.Ext(filePath))
+	if videoExtensions[ext] {
+		http.Error(w, "cannot rotate video files", http.StatusBadRequest)
+		return
+	}
+
+	if rawExtensions[ext] {
+		orientation := map[int]string{90: "6", 180: "3", 270: "8"}[req.Angle]
+		if out, err := exec.Command("exiftool", "-overwrite_original", "-n", "-Orientation="+orientation, filePath).CombinedOutput(); err != nil {
+			log.Printf("failed to set EXIF orientation on %s: %s", filePath, string(out))
+		}
+		// Delete cached preview so it's re-extracted with orientation applied
+		previewDir := filepath.Join(s.libraryDir, ".previews")
+		os.Remove(thumbnail.PreviewPath(filePath, previewDir))
+	} else {
+		if ext != ".jpg" && ext != ".jpeg" && ext != ".png" {
+			http.Error(w, "rotation not supported for this file type", http.StatusBadRequest)
+			return
+		}
+		if err := rotateFile(filePath, req.Angle); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	os.Remove(thumbnail.ThumbPath(filePath, filepath.Join(s.libraryDir, ".thumbnails")))
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func rotateFile(path string, angle int) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("failed to open: %w", err)
+	}
+	defer f.Close()
+
+	src, format, err := image.Decode(f)
+	if err != nil {
+		return fmt.Errorf("failed to decode: %w", err)
+	}
+	f.Close()
+
+	rotated := rotateImage(src, angle)
+
+	out, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("failed to create: %w", err)
+	}
+	defer out.Close()
+
+	switch format {
+	case "jpeg":
+		return jpeg.Encode(out, rotated, &jpeg.Options{Quality: 95})
+	case "png":
+		return png.Encode(out, rotated)
+	default:
+		return fmt.Errorf("unsupported image format: %s", format)
+	}
+}
+
+func rotateImage(src image.Image, angle int) image.Image {
+	b := src.Bounds()
+	w, h := b.Dx(), b.Dy()
+
+	switch angle {
+	case 90:
+		dst := image.NewRGBA(image.Rect(0, 0, h, w))
+		for y := 0; y < h; y++ {
+			for x := 0; x < w; x++ {
+				dst.Set(h-1-y, x, src.At(b.Min.X+x, b.Min.Y+y))
+			}
+		}
+		return dst
+	case 180:
+		dst := image.NewRGBA(image.Rect(0, 0, w, h))
+		for y := 0; y < h; y++ {
+			for x := 0; x < w; x++ {
+				dst.Set(w-1-x, h-1-y, src.At(b.Min.X+x, b.Min.Y+y))
+			}
+		}
+		return dst
+	case 270:
+		dst := image.NewRGBA(image.Rect(0, 0, h, w))
+		for y := 0; y < h; y++ {
+			for x := 0; x < w; x++ {
+				dst.Set(y, w-1-x, src.At(b.Min.X+x, b.Min.Y+y))
+			}
+		}
+		return dst
+	default:
+		return src
+	}
+}
+
+func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Files  []string `json:"files"`
+		Format string   `json:"format"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Format != "raw" && req.Format != "jpeg" {
+		http.Error(w, "format must be 'raw' or 'jpeg'", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.Files) == 0 {
+		http.Error(w, "no files specified", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"mnemosyne-"+req.Format+".zip\"")
+
+	zw := zip.NewWriter(w)
+	defer zw.Close()
+
+	for _, relPath := range req.Files {
+		filePath := filepath.Join(s.libraryDir, filepath.Clean("/"+relPath))
+		if !strings.HasPrefix(filePath, s.libraryDir) {
+			continue
+		}
+
+		ext := strings.ToLower(filepath.Ext(filePath))
+
+		if req.Format == "raw" {
+			if rawExtensions[ext] {
+				addFileToZip(zw, filePath, relPath)
+				xmpPath := filePath[:len(filePath)-len(ext)] + ".xmp"
+				if _, err := os.Stat(xmpPath); err == nil {
+					xmpRel := relPath[:len(relPath)-len(ext)] + ".xmp"
+					addFileToZip(zw, xmpPath, xmpRel)
+				}
+			} else if !videoExtensions[ext] {
+				addFileToZip(zw, filePath, relPath)
+			}
+		} else {
+			if rawExtensions[ext] {
+				previewDir := filepath.Join(s.libraryDir, ".previews")
+				previewPath := thumbnail.PreviewPath(filePath, previewDir)
+				if _, err := os.Stat(previewPath); err != nil {
+					os.MkdirAll(previewDir, 0755)
+					metadata.ExtractPreview(filePath, previewPath)
+				}
+				if _, err := os.Stat(previewPath); err == nil {
+					jpegRel := relPath[:len(relPath)-len(ext)] + ".jpg"
+					addFileToZip(zw, previewPath, jpegRel)
+				}
+			} else if !videoExtensions[ext] {
+				addFileToZip(zw, filePath, relPath)
+			}
+		}
+	}
+}
+
+func addFileToZip(zw *zip.Writer, srcPath, name string) error {
+	f, err := os.Open(srcPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	fi, err := f.Stat()
+	if err != nil {
+		return err
+	}
+
+	h, err := zip.FileInfoHeader(fi)
+	if err != nil {
+		return err
+	}
+	h.Name = name
+	h.Method = zip.Store
+
+	w, err := zw.CreateHeader(h)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(w, f)
+	return err
 }
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
