@@ -547,30 +547,65 @@ func rotateFile(path string, angle int) error {
 	if err != nil {
 		return fmt.Errorf("failed to open: %w", err)
 	}
-	defer f.Close()
 
 	src, format, err := image.Decode(f)
+	f.Close()
 	if err != nil {
 		return fmt.Errorf("failed to decode: %w", err)
 	}
-	f.Close()
 
 	rotated := rotateImage(src, angle)
 
-	out, err := os.Create(path)
+	// Write to a temp file in the same directory, then rename over the
+	// original atomically. This avoids truncating the source file before
+	// we have valid rotated data to write back — if encoding fails mid-
+	// way the original is left untouched.
+	tmpDir := filepath.Dir(path)
+	out, err := os.CreateTemp(tmpDir, "rotate-*.tmp")
 	if err != nil {
-		return fmt.Errorf("failed to create: %w", err)
+		return fmt.Errorf("failed to create temp file: %w", err)
 	}
-	defer out.Close()
+	tmpPath := out.Name()
 
+	type encoder struct {
+		write func(io.Writer, image.Image) error
+		name  string
+	}
+	var enc encoder
 	switch format {
 	case "jpeg":
-		return jpeg.Encode(out, rotated, &jpeg.Options{Quality: 95})
+		enc = encoder{
+			write: func(w io.Writer, img image.Image) error {
+				return jpeg.Encode(w, img, &jpeg.Options{Quality: 95})
+			},
+			name: "jpeg",
+		}
 	case "png":
-		return png.Encode(out, rotated)
+		enc = encoder{
+			write: png.Encode,
+			name:  "png",
+		}
 	default:
+		os.Remove(tmpPath)
 		return fmt.Errorf("unsupported image format: %s", format)
 	}
+
+	if err := enc.write(out, rotated); err != nil {
+		out.Close()
+		os.Remove(tmpPath)
+		return fmt.Errorf("failed to encode %s: %w", enc.name, err)
+	}
+	if err := out.Close(); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, path); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("failed to save rotated file: %w", err)
+	}
+
+	return nil
 }
 
 func rotateImage(src image.Image, angle int) image.Image {

@@ -1369,8 +1369,7 @@
             body: JSON.stringify({ file: this.viewerFile, angle }),
           });
           if (res.ok) {
-            this.viewerRotation = 0;
-            this.viewerTS = Date.now();
+this.viewerTS = Date.now();
           } else {
             const text = await res.text();
             console.error("rotate failed:", res.status, text);
