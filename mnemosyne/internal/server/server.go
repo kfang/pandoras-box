@@ -164,7 +164,15 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Apply RAW orientation so the preview reflects the file's current EXIF state
-		if angle := readOrientation(filePath); angle > 0 {
+		orientationPath := filePath
+		ext := strings.ToLower(filepath.Ext(filePath))
+		if rawExtensions[ext] {
+			xmpPath := filePath[:len(filePath)-len(ext)] + ".xmp"
+			if _, err := os.Stat(xmpPath); err == nil {
+				orientationPath = xmpPath
+			}
+		}
+		if angle := readOrientation(orientationPath); angle > 0 {
 			if err := rotateFile(previewPath, angle); err != nil {
 				log.Printf("failed to apply orientation to preview %s: %v", previewPath, err)
 			}
@@ -518,11 +526,17 @@ func (s *Server) handleRotate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if rawExtensions[ext] {
-		orientation := map[int]string{90: "6", 180: "3", 270: "8"}[req.Angle]
-		if out, err := exec.Command("exiftool", "-overwrite_original", "-n", "-Orientation="+orientation, filePath).CombinedOutput(); err != nil {
-			log.Printf("failed to set EXIF orientation on %s: %s", filePath, string(out))
-		}
+		if rawExtensions[ext] {
+			orientation := map[int]string{90: "6", 180: "3", 270: "8"}[req.Angle]
+			targetPath := filePath
+			xmpPath := filePath[:len(filePath)-len(ext)] + ".xmp"
+			if _, err := os.Stat(xmpPath); err == nil {
+				targetPath = xmpPath
+			}
+			if out, err := exec.Command("exiftool", "-overwrite_original", "-n", "-Orientation="+orientation, targetPath).CombinedOutput(); err != nil {
+				log.Printf("failed to set orientation on %s: %s", targetPath, string(out))
+			}
+		},
 		// Delete cached preview so it's re-extracted with orientation applied
 		previewDir := filepath.Join(s.libraryDir, ".previews")
 		os.Remove(thumbnail.PreviewPath(filePath, previewDir))
