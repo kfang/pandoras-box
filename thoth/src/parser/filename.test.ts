@@ -100,6 +100,40 @@ describe("parseFilename", () => {
     expect(result!.group).toBe("LuCaZ");
   });
 
+  it("pattern 6: subtitle between volume and brackets — {Series} v{NN} - {subtitle} [{pub}] [{group}].ext", () => {
+    const result = parseFilename(
+      "/mnt/h/manga/The Saga of Tanya the Evil v01 - Deus lo Vult [Yen Press] [LuCaZ].epub"
+    );
+    expect(result).not.toBeNull();
+    expect(result!.seriesName).toBe("The Saga of Tanya the Evil");
+    expect(result!.volume).toBe(1);
+    expect(result!.publisher).toBe("Yen Press");
+    expect(result!.group).toBe("LuCaZ");
+  });
+
+  it("pattern 6: subtitle with extra dashes — v{NN} - {a} - {b} [pub] [group]", () => {
+    const result = parseFilename(
+      "/mnt/h/manga/The Saga of Tanya the Evil v13 - Dum Spiro, Spero - Part 1 [Yen Press] [LuCaZ].epub"
+    );
+    expect(result).not.toBeNull();
+    expect(result!.seriesName).toBe("The Saga of Tanya the Evil");
+    expect(result!.volume).toBe(13);
+    expect(result!.publisher).toBe("Yen Press");
+  });
+
+  it("pattern 6: three+ bracket groups — {Series} v{NN} [{pub}] [{extra}] [{group}].ext", () => {
+    const result = parseFilename(
+      "/mnt/h/manga/The Diary of a Middle-Aged Sage's Carefree Life in Another World v01 [J-Novel Club] [Premium] [CleanBookGuy].epub"
+    );
+    expect(result).not.toBeNull();
+    expect(result!.seriesName).toBe(
+      "The Diary of a Middle-Aged Sage's Carefree Life in Another World"
+    );
+    expect(result!.volume).toBe(1);
+    expect(result!.publisher).toBe("J-Novel Club");
+    expect(result!.group).toBe("CleanBookGuy");
+  });
+
   it("pattern 7: chapter-based — {Series} - c{chapters} (v{NN}) [{group}].ext", () => {
     const result = parseFilename(
       "/mnt/h/manga/Furyou Taimashi Reina - c001-010x1 (v01) [Moe Panda Scans].cbz"

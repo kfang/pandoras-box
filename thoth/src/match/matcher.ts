@@ -43,6 +43,50 @@ function levenshtein(a: string, b: string): number {
   return dp[m][n];
 }
 
+function describeMatch(series: SeriesMetadata): string {
+  const parts = [series.provider];
+  if (series.publisher) parts.push(series.publisher);
+  return parts.join(", ");
+}
+
+// Manual entries get a negative synthetic id so they can never collide with a
+// real provider id, which lets getSeriesById distinguish a cached manual
+// series (served straight from cache) from one that needs an API round-trip.
+function manualId(): number {
+  return -(Date.now() * 1000 + Math.floor(Math.random() * 1000));
+}
+
+async function manualEntry(seriesName: string): Promise<SeriesMetadata> {
+  console.error(`\n  Manual entry for "${seriesName}":`);
+  const title = (await ask(`  Title [${seriesName}]: `)) || seriesName;
+  const publisher = await ask("  Publisher (optional): ");
+  const description = await ask("  Description (optional): ");
+  const yearStr = await ask("  Year (optional): ");
+  const year = yearStr ? parseInt(yearStr, 10) : NaN;
+
+  return {
+    id: manualId(),
+    title: { english: title },
+    description: description || undefined,
+    genres: [],
+    tags: [],
+    startDate: isNaN(year) ? undefined : { year },
+    staff: [],
+    publisher: publisher || undefined,
+    provider: "manual",
+  };
+}
+
+async function manualMatch(
+  seriesName: string,
+  provider: CachedProvider
+): Promise<MatchResult> {
+  const series = await manualEntry(seriesName);
+  provider.setManualSeries(seriesName, series);
+  console.error(`  ✓ "${seriesName}" → "${series.title.english}" (manual)`);
+  return { series, confidence: 1, confirmed: true };
+}
+
 function scoreMatch(query: string, series: SeriesMetadata): number {
   const titles = [
     series.title.romaji,
@@ -96,7 +140,12 @@ export async function matchSeries(
   if (results.length === 0) {
     if (interactive) {
       console.error(`\nNo results found for "${seriesName}".`);
-      const term = await ask("Enter search term (or empty to skip): ");
+      const term = await ask(
+        "Enter search term, 'm' to enter info manually, or empty to skip: "
+      );
+      if (term.toLowerCase() === "m") {
+        return manualMatch(seriesName, provider);
+      }
       if (term) {
         results = await provider.searchSeries(term);
       }
@@ -119,7 +168,7 @@ export async function matchSeries(
   // High confidence: auto-accept
   if (best.confidence >= 0.85) {
     console.error(
-      `  ✓ "${seriesName}" → "${displayTitle}" (${(best.confidence * 100).toFixed(0)}%)`
+      `  ✓ "${seriesName}" → "${displayTitle}" (${(best.confidence * 100).toFixed(0)}%) [${describeMatch(best.series)}]`
     );
     provider.setConfirmedMapping(seriesName, best.series.id);
     return { ...best, confirmed: true };
@@ -127,7 +176,7 @@ export async function matchSeries(
 
   if (!interactive) {
     console.error(
-      `  ? "${seriesName}" → "${displayTitle}" (${(best.confidence * 100).toFixed(0)}%) — skipped (non-interactive)`
+      `  ? "${seriesName}" → "${displayTitle}" (${(best.confidence * 100).toFixed(0)}%) [${describeMatch(best.series)}] — skipped (non-interactive)`
     );
     return null;
   }
@@ -135,12 +184,15 @@ export async function matchSeries(
   // Medium confidence: prompt
   if (best.confidence >= 0.5) {
     const choice = await promptChoice(
-      `\n  Is "${displayTitle}" correct for "${seriesName}"?`,
+      `\n  Is "${displayTitle}" [${describeMatch(best.series)}] correct for "${seriesName}"? (or 'm' for manual entry)`,
       []
     );
     if (choice === "accept") {
       provider.setConfirmedMapping(seriesName, best.series.id);
       return { ...best, confirmed: true };
+    }
+    if (choice.toLowerCase() === "m") {
+      return manualMatch(seriesName, provider);
     }
     if (choice !== "reject") {
       // User entered a search term
@@ -156,14 +208,18 @@ export async function matchSeries(
     const title =
       s.series.title.english || s.series.title.romaji || "Unknown";
     console.error(
-      `    ${i + 1}. "${title}" (${(s.confidence * 100).toFixed(0)}%)`
+      `    ${i + 1}. "${title}" (${(s.confidence * 100).toFixed(0)}%) [${describeMatch(s.series)}]`
     );
   }
 
   const answer = await ask(
-    "  Enter number to select, search term, or empty to skip: "
+    "  Enter number to select, search term, 'm' for manual entry, or empty to skip: "
   );
   if (!answer) return null;
+
+  if (answer.toLowerCase() === "m") {
+    return manualMatch(seriesName, provider);
+  }
 
   const num = parseInt(answer, 10);
   if (!isNaN(num) && num >= 1 && num <= scored.length) {

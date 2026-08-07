@@ -93,6 +93,32 @@ function buildUpdatedOpf(
   // Update dc:language
   metadata["dc:language"] = "en";
 
+  // Embed provider ids as dc:identifiers so grimmory's bookdrop extractor picks
+  // them up. Calibre's bare `<prefix>:<id>` form is used (no opf:scheme
+  // attribute needed — EpubMetadataExtractor maps the prefix).
+  const idValues: string[] = [];
+  if (meta.series.comicvineId) {
+    idValues.push(`comicvine:${meta.series.comicvineId}`);
+  }
+  if (meta.series.ranobedbId) {
+    idValues.push(`ranobedb:${meta.series.ranobedbId}`);
+  }
+  if (idValues.length > 0) {
+    let ids: any[] = [];
+    if (metadata["dc:identifier"] !== undefined) {
+      ids = Array.isArray(metadata["dc:identifier"])
+        ? metadata["dc:identifier"]
+        : [metadata["dc:identifier"]];
+    }
+    for (const idValue of idValues) {
+      const already = ids.some(
+        (i: any) => (typeof i === "string" ? i : i?.["#text"]) === idValue
+      );
+      if (!already) ids.push(idValue);
+    }
+    metadata["dc:identifier"] = ids;
+  }
+
   // Handle calibre series metadata
   // Remove existing calibre series meta tags
   let metaEntries: any[] = [];

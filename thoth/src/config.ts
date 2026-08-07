@@ -8,6 +8,7 @@ const configSchema = z.object({
   dryRun: z.boolean().default(false),
   format: z.enum(["cbz", "epub"]).optional(),
   cache: z.string().default(path.join(os.homedir(), ".thoth-cache.json")),
+  yamlDir: z.string().optional(),
   interactive: z.boolean().default(true),
   clearCache: z.boolean().default(false),
 });

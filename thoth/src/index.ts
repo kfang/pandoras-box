@@ -6,7 +6,7 @@ import { runPipeline } from "./pipeline";
 const program = new Command()
   .name("thoth")
   .description(
-    "Scan manga/light novel archives and inject metadata from AniList for Calibre import."
+    "Scan manga/light novel archives and inject metadata (ComicVine, falling back to AniList) for Calibre/grimmory import."
   )
   .version("0.1.0")
   .argument("<path>", "File or directory to process")
@@ -14,6 +14,10 @@ const program = new Command()
   .option("-n, --dry-run", "Preview changes without writing", false)
   .option("-f, --format <type>", 'Only process "cbz" or "epub"')
   .option("--cache <path>", "Cache file path")
+  .option(
+    "--yaml-dir <path>",
+    "Directory of hand-curated per-series YAML files, checked before other providers"
+  )
   .option("--no-interactive", "Skip prompts, only process high-confidence matches")
   .option("--clear-cache", "Clear cache before running", false);
 
@@ -32,6 +36,7 @@ program.action(async (targetPath: string, opts: Record<string, any>) => {
       dryRun: opts.dryRun,
       format: opts.format,
       cache: opts.cache,
+      yamlDir: opts.yamlDir,
       interactive: opts.interactive,
       clearCache: opts.clearCache,
     });

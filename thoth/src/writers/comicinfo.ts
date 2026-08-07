@@ -47,8 +47,22 @@ function buildComicInfoXml(meta: VolumeMetadata): string {
     },
   };
 
-  // Remove empty string values
   const comicInfo = info.ComicInfo as Record<string, unknown>;
+
+  // Embed provider ids so grimmory's bookdrop extractor picks them up
+  // (CbxMetadataExtractor parses `[BookLore:<Key>] <id>` lines out of Notes).
+  const notes: string[] = [];
+  if (meta.series.comicvineId) {
+    notes.push(`[BookLore:ComicvineId] ${meta.series.comicvineId}`);
+  }
+  if (meta.series.ranobedbId) {
+    notes.push(`[BookLore:RanobedbId] ${meta.series.ranobedbId}`);
+  }
+  if (notes.length > 0) {
+    comicInfo.Notes = notes.join("\n");
+  }
+
+  // Remove empty string values
   for (const [key, value] of Object.entries(comicInfo)) {
     if (value === "") delete comicInfo[key];
   }

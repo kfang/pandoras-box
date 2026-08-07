@@ -1,0 +1,25 @@
+title:
+  english: "Girl Meets Dragon"
+  romaji: "Girl Meets Dragon"
+publisher: "Seven Seas"
+description: "Series-level synopsis, used for any volume without its own override."
+genres: ["Fantasy", "Isekai"]
+tags: ["Dragons"]
+startDate:
+  year: 2021
+staff:
+  - name: "Some Author"
+    role: "Story"
+  - name: "Some Artist"
+    role: "Art"
+siteUrl: "https://example.com/girl-meets-dragon"
+
+volumes:
+  - volume: 1
+    description: "Volume 1 specific synopsis."
+    coverImage: "https://example.com/covers/vol1.jpg"
+    startDate: { year: 2021, month: 3, day: 15 }
+  - volume: 2
+    description: "Volume 2 specific synopsis."
+    coverImage: "https://example.com/covers/vol2.jpg"
+    startDate: { year: 2021, month: 9, day: 1 }

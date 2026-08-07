@@ -61,6 +61,7 @@ function mapMedia(media: any): SeriesMetadata {
     coverImage: media.coverImage?.large ?? undefined,
     siteUrl: media.siteUrl ?? undefined,
     format: media.format ?? undefined,
+    provider: "anilist",
   };
 }
 
@@ -129,8 +130,9 @@ export class AniListProvider implements MetadataProvider {
     return (data.Page?.media ?? []).map(mapMedia);
   }
 
-  async getSeriesById(id: number): Promise<SeriesMetadata | null> {
-    const data = await rateLimitedFetch(GET_BY_ID_QUERY, { id });
+  async getSeriesById(id: string | number): Promise<SeriesMetadata | null> {
+    const numId = typeof id === "number" ? id : parseInt(id, 10);
+    const data = await rateLimitedFetch(GET_BY_ID_QUERY, { id: numId });
     return data.Media ? mapMedia(data.Media) : null;
   }
 }

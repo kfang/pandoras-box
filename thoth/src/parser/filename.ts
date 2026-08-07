@@ -11,9 +11,13 @@ const LN_PATTERN = /^(.+?)\s*-\s*LN\s+(\d+)\s*(?:Premium)?$/;
 // Pattern 5: "Volume NN" style — "{Series} - Volume {NN}.ext" or "{Series} SP - Volume {NN}.ext"
 const VOLUME_WORD_PATTERN = /^(.+?)\s*-\s*Volume\s+(\d+)\s*(?:Premium)?$/;
 
-// Pattern 6: bracket publisher — "{Series} v{NN} [{publisher}] [{group}].ext"
+// Pattern 6: bracket publisher — "{Series} v{NN}[ - {subtitle}] [{publisher}][ [{extra}]...] [{group}].ext"
+// An optional volume subtitle may sit between the volume number and the brackets
+// (e.g. "... v01 - Deus lo Vult [Yen Press] [LuCaZ]"), and there may be any number
+// of trailing bracket groups (e.g. "... v01 [J-Novel Club] [Premium] [CleanBookGuy]").
+// The first bracket is the publisher; the last is captured as the group.
 const BRACKET_PATTERN =
-  /^(.+?)\s+v(\d+)\s*\[([^\]]+)\]\s*(?:\[([^\]]+)\])?$/;
+  /^(.+?)\s+v(\d+)\b[^\[]*\[([^\]]+)\](?:\s*\[([^\]]+)\])*\s*$/;
 
 // Pattern 1/2/3: volume with optional extras — captures everything before vNN as the full name
 // This handles basic "Series vNN", "Series vNN (extras)", and "Series - SubSeries vNN (extras)"

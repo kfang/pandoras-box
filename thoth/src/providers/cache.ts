@@ -10,7 +10,7 @@ interface CacheEntry<T> {
 interface CacheData {
   searches: Record<string, CacheEntry<SeriesMetadata[]>>;
   series: Record<string, CacheEntry<SeriesMetadata>>;
-  mappings: Record<string, number>; // seriesName -> anilist ID (confirmed)
+  mappings: Record<string, string | number>; // seriesName -> provider ID (confirmed)
 }
 
 const TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -51,12 +51,21 @@ export class CachedProvider implements MetadataProvider {
     return !!entry && Date.now() - entry.timestamp < TTL_MS;
   }
 
-  getConfirmedMapping(seriesName: string): number | undefined {
+  getConfirmedMapping(seriesName: string): string | number | undefined {
     return this.cache.mappings[seriesName];
   }
 
-  setConfirmedMapping(seriesName: string, anilistId: number): void {
-    this.cache.mappings[seriesName] = anilistId;
+  setConfirmedMapping(seriesName: string, seriesId: string | number): void {
+    this.cache.mappings[seriesName] = seriesId;
+    this.dirty = true;
+  }
+
+  // Stores a manually-entered series directly in the cache (bypassing the
+  // inner provider, which has never heard of it) and confirms the mapping so
+  // later runs resolve it via getSeriesById without re-prompting.
+  setManualSeries(seriesName: string, series: SeriesMetadata): void {
+    this.cache.series[String(series.id)] = { data: series, timestamp: Date.now() };
+    this.cache.mappings[seriesName] = series.id;
     this.dirty = true;
   }
 
@@ -74,12 +83,34 @@ export class CachedProvider implements MetadataProvider {
     return results;
   }
 
-  async getSeriesById(id: number): Promise<SeriesMetadata | null> {
+  async getSeriesById(id: string | number): Promise<SeriesMetadata | null> {
     const key = String(id);
     const cached = this.cache.series[key];
     if (this.isValid(cached)) return cached.data;
 
     const result = await this.inner.getSeriesById(id);
+    if (result) {
+      this.cache.series[key] = { data: result, timestamp: Date.now() };
+      this.dirty = true;
+    }
+    return result;
+  }
+
+  get supportsPerVolume(): boolean {
+    return typeof this.inner.getVolume === "function";
+  }
+
+  async getVolume(
+    seriesId: string | number,
+    volumeNumber: number
+  ): Promise<SeriesMetadata | null> {
+    if (!this.inner.getVolume) return null;
+
+    const key = `vol:${seriesId}:${volumeNumber}`;
+    const cached = this.cache.series[key];
+    if (this.isValid(cached)) return cached.data;
+
+    const result = await this.inner.getVolume(seriesId, volumeNumber);
     if (result) {
       this.cache.series[key] = { data: result, timestamp: Date.now() };
       this.dirty = true;

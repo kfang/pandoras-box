@@ -20,7 +20,7 @@ export interface SeriesGroup {
 }
 
 export interface SeriesMetadata {
-  id: number;
+  id: string | number;
   title: {
     romaji?: string;
     english?: string;
@@ -34,6 +34,10 @@ export interface SeriesMetadata {
   coverImage?: string;
   siteUrl?: string;
   format?: string;
+  comicvineId?: string; // ComicVine resource id incl. type prefix, e.g. "4050-12345"
+  ranobedbId?: string; // RanobeDB book id, e.g. "12020"
+  publisher?: string;
+  provider: string; // name of the MetadataProvider that produced this result, e.g. "comicvine"
 }
 
 export interface StaffMember {
