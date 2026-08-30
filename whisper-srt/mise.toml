@@ -1,4 +1,0 @@
-[tools]
-ffmpeg = { version = "latest" }
-pipx = { version = "latest" }
-"pipx:openai-whisper" = { version = "latest" }
