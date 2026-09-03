@@ -1,0 +1,10 @@
+{
+  "extends": [
+    "@tsconfig/bases/node-ts",
+    "@tsconfig/bases/strictest",
+    "@tsconfig/bases/node26"
+  ],
+  "compilerOptions": {
+    "noEmit": true,
+  }
+}

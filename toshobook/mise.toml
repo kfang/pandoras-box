@@ -1,2 +1,4 @@
 [tools]
-rust = { version = "latest", components = "rust-analyzer" }
+"aqua:ip7z/7zip" = { version = "latest" }
+node = { version = "26" }
+pnpm = { version = "12" }
