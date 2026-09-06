@@ -1,12 +1,23 @@
-import { execa } from "execa";
-import { glob, stat } from "node:fs/promises";
+import fsp from "node:fs/promises";
+import fs from "node:fs";
 import path from "node:path";
+import { ComicInfo } from "./comicinfo.ts";
+import sevenZ from "./sevenZ.ts";
+import xxHash from "@node-rs/xxhash";
 
-const basePath = process.argv[2];
-const sevenZipCmd = "7zz";
+const importPath = process.env["IMPORT_DIR"];
+const comicsPath = process.env["COMICS_DIR"];
 
-if (!basePath) {
+if (!importPath || !comicsPath) {
   console.error("no basePath defined");
+  process.exit(1);
+}
+
+try {
+  await fsp.access(importPath, fsp.constants.W_OK);
+  await fsp.access(comicsPath, fsp.constants.W_OK);
+} catch (e) {
+  console.error(e);
   process.exit(1);
 }
 
@@ -14,9 +25,9 @@ async function* getCbzFiles(basePath: string): AsyncGenerator<string> {
   const pattern = path.join(basePath, "**/*.cbz");
   console.log(`looking for cbz files in ${pattern}`);
 
-  const files = glob(pattern);
+  const files = fsp.glob(pattern);
   for await (const file of files) {
-    const fileStat = await stat(file);
+    const fileStat = await fsp.stat(file);
     if (!fileStat.isFile()) {
       continue;
     }
@@ -24,8 +35,26 @@ async function* getCbzFiles(basePath: string): AsyncGenerator<string> {
   }
 }
 
-for await (const f of getCbzFiles(basePath)) {
-  console.log(`extracting ComicInfo.xml from ${f}`)
-  const { stdout } = await execa(sevenZipCmd, ["x", f, "ComicInfo.xml", "-so"]);
-  console.log(stdout);
+for await (const f of getCbzFiles(importPath)) {
+  console.log(`processing: ${f}`);
+
+  const dataStream = fs.createReadStream(f);
+  const hasher = xxHash.xxh3.Xxh3.withSeed();
+  for await (const chunk of dataStream) {
+    hasher.update(chunk);
+  }
+  const fileHash = hasher.digest().toString(16).padStart(16, "0");
+  console.log(`\tfileHash: ${fileHash}`);
+
+  console.log(`\textracting ComicInfo.xml`)
+
+  const comicInfoXml = await sevenZ.extractFile(f, "ComicInfo.xml");
+  if (!comicInfoXml) {
+    continue;
+  }
+
+  const ci = ComicInfo.parse(comicInfoXml);
+  if (!ci) {
+    continue;
+  }
 }
