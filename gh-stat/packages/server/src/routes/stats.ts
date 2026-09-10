@@ -205,6 +205,122 @@ export function registerStatRoutes(app: FastifyInstance, storage: StorageProvide
       return reply.send(calcReviewerFamiliarity(prs, fullName, groups, lookbackDays));
     },
   );
+
+  // GET /api/stats/codeowners — all codeowner groups with summary stats
+  app.get<{ Querystring: Record<string, unknown> }>("/api/stats/codeowners", async (req, reply) => {
+    const window = parseTimeWindow(req.query);
+    const groups = await resolveCodeOwnerGroups(storage);
+    const allRepos = await storage.getRepos();
+    const prsByRepo = new Map<string, GhPullRequest[]>();
+    for (const repo of allRepos) {
+      prsByRepo.set(repo.full_name, await storage.getPullRequests(repo.full_name));
+    }
+    const demand = calcCodeOwnerDemand(groups, prsByRepo, window);
+
+    const result = demand.groups.map((g) => {
+      const group = groups.find((gr) => gr.teamSlug === g.teamSlug);
+      const repoFamiliarity = g.byRepo.map((r) => {
+        const prs = prsByRepo.get(r.repoFullName) ?? [];
+        const fam = calcReviewerFamiliarity(prs, r.repoFullName, groups, 30);
+        const groupFam = fam.groupFamiliarity.find((gf) => gf.teamSlug === g.teamSlug);
+        return {
+          repoFullName: r.repoFullName,
+          prsOpened: r.prsOpened,
+          familiarityPct: groupFam?.familiarityPct ?? null,
+        };
+      });
+      return {
+        org: group?.org ?? "",
+        teamSlug: g.teamSlug,
+        memberCount: g.memberCount,
+        members: group?.members ?? [],
+        totalPRsOpened: g.totalPRsOpened,
+        prsPerEngineer: g.prsPerEngineer,
+        repos: repoFamiliarity,
+      };
+    });
+    return reply.send(result);
+  });
+
+  // GET /api/stats/codeowners/:org/:teamSlug — detailed stats for one team
+  app.get<{ Params: { org: string; "*": string }; Querystring: Record<string, unknown> }>(
+    "/api/stats/codeowners/:org/*",
+    async (req, reply) => {
+      const { org } = req.params;
+      const teamSlug = (req.params as Record<string, string>)["*"] ?? "";
+      const window = parseTimeWindow(req.query);
+      const groups = await resolveCodeOwnerGroups(storage);
+      const group = groups.find((g) => g.org === org && g.teamSlug === teamSlug);
+      if (!group) return reply.status(404).send("Team not found");
+
+      const prsByRepo = new Map<string, GhPullRequest[]>();
+      const reviewsByRepo = new Map<string, GhPRReview[]>();
+      for (const repoFullName of group.repos) {
+        prsByRepo.set(repoFullName, await storage.getPullRequests(repoFullName));
+        reviewsByRepo.set(repoFullName, await storage.getReviews(repoFullName));
+      }
+
+      const allPRs = [...prsByRepo.values()].flat();
+      const allReviews = [...reviewsByRepo.values()].flat();
+      const reviewsByPR = groupReviewsByPR(allReviews);
+
+      const perRepo = group.repos.map((repoFullName) => {
+        const prs = prsByRepo.get(repoFullName) ?? [];
+        const reviews = reviewsByRepo.get(repoFullName) ?? [];
+        const repoReviewsByPR = groupReviewsByPR(reviews);
+        const fam = calcReviewerFamiliarity(prs, repoFullName, groups, 30);
+        const groupFam = fam.groupFamiliarity.find((gf) => gf.teamSlug === teamSlug);
+        return {
+          repoFullName,
+          velocity: calcPRVelocity(prs),
+          demand: calcRepoDemand(prs, repoFullName, window),
+          reviewCycle: calcReviewCycle(prs, repoReviewsByPR),
+          familiarityPct: groupFam?.familiarityPct ?? null,
+        };
+      });
+
+      // Aggregate member activity across all owned repos (filtered by time window)
+      const sinceMs = window.since.getTime();
+      const untilMs = window.until.getTime();
+      const memberActivity = group.members.map((login) => {
+        let totalPRs = 0;
+        let mergedPRs = 0;
+        let lastPRDate: string | null = null;
+        const activeRepos: string[] = [];
+        for (const repoFullName of group.repos) {
+          const prs = prsByRepo.get(repoFullName) ?? [];
+          const memberPRs = prs.filter((p) => {
+            if (p.user_login !== login) return false;
+            const t = new Date(p.created_at).getTime();
+            return t >= sinceMs && t < untilMs;
+          });
+          if (memberPRs.length > 0) {
+            totalPRs += memberPRs.length;
+            mergedPRs += memberPRs.filter((p) => p.merged_at !== null).length;
+            activeRepos.push(repoFullName);
+            for (const pr of memberPRs) {
+              if (!lastPRDate || pr.created_at > lastPRDate) lastPRDate = pr.created_at;
+            }
+          }
+        }
+        return { login, totalPRs, mergedPRs, activeRepos: activeRepos.length, lastPRDate };
+      });
+      memberActivity.sort((a, b) => b.totalPRs - a.totalPRs);
+
+      return reply.send({
+        org,
+        teamSlug,
+        members: group.members,
+        repos: group.repos,
+        velocity: calcPRVelocity(allPRs),
+        contributors: calcContributorStats(allPRs),
+        reviewCycle: calcReviewCycle(allPRs, reviewsByPR),
+        demand: calcCodeOwnerDemand([group], prsByRepo, window),
+        memberActivity,
+        perRepo,
+      });
+    },
+  );
 }
 
 function groupReviewsByPR(reviews: GhPRReview[]): Map<number, GhPRReview[]> {

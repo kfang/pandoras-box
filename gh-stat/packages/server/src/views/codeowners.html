@@ -1,0 +1,159 @@
+<div
+  x-data="codeownersPage()"
+  x-init="init()"
+>
+  <h1>Code Owners</h1>
+
+  <!-- Summary row -->
+  <div class="grid" style="margin-bottom:16px;" x-show="groups.length > 0">
+    <div class="card stat">
+      <div class="value" x-text="groups.length"></div>
+      <div class="label">Teams</div>
+    </div>
+    <div class="card stat">
+      <div class="value" x-text="totalMembers"></div>
+      <div class="label">Total members</div>
+    </div>
+    <div class="card stat">
+      <div class="value" x-text="totalRepos"></div>
+      <div class="label">Owned repos</div>
+    </div>
+    <div class="card stat">
+      <div class="value" x-text="totalPRs"></div>
+      <div class="label">PRs opened</div>
+    </div>
+  </div>
+
+  <!-- Teams table -->
+  <div class="card" style="padding:0;overflow:hidden;">
+    <table>
+      <thead>
+        <tr>
+          <th @click="toggleSort('teamSlug')" class="sortable" :class="sortField === 'teamSlug' && 'sort-active'">
+            Team <span x-text="sortIndicator('teamSlug')"></span>
+          </th>
+          <th @click="toggleSort('memberCount')" class="sortable" :class="sortField === 'memberCount' && 'sort-active'">
+            Members <span x-text="sortIndicator('memberCount')"></span>
+          </th>
+          <th>Repos</th>
+          <th @click="toggleSort('totalPRsOpened')" class="sortable" :class="sortField === 'totalPRsOpened' && 'sort-active'">
+            PRs Opened <span x-text="sortIndicator('totalPRsOpened')"></span>
+          </th>
+          <th @click="toggleSort('prsPerEngineer')" class="sortable" :class="sortField === 'prsPerEngineer' && 'sort-active'">
+            PRs / Engineer <span x-text="sortIndicator('prsPerEngineer')"></span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="g in sortedGroups" :key="g.teamSlug">
+          <tr>
+            <td>
+              <a :href="'/codeowners/' + g.org + '/' + g.teamSlug" x-text="g.teamSlug"></a>
+            </td>
+            <td x-text="g.memberCount"></td>
+            <td x-text="g.repos.length"></td>
+            <td x-text="g.totalPRsOpened"></td>
+            <td>
+              <span
+                :class="demandBadgeClass(g.prsPerEngineer)"
+                x-text="g.prsPerEngineer.toFixed(1)"
+              ></span>
+            </td>
+          </tr>
+        </template>
+        <tr x-show="groups.length === 0 && !loading">
+          <td colspan="5" style="text-align:center;color:#656d76;padding:24px;">No code owner teams found.</td>
+        </tr>
+        <tr x-show="loading">
+          <td colspan="5" style="text-align:center;color:#656d76;padding:24px;">Loading…</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<style>
+  th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+  th.sortable:hover { background: #eaeef2; }
+  th.sort-active { color: #0969da; }
+</style>
+
+<script>
+function codeownersPage() {
+  return {
+    groups: [],
+    loading: false,
+    sortField: 'prsPerEngineer',
+    sortDir: 'desc',
+
+    get totalMembers() {
+      const seen = new Set();
+      for (const g of this.groups) {
+        for (const m of g.members) seen.add(m);
+      }
+      return seen.size;
+    },
+
+    get totalRepos() {
+      const seen = new Set();
+      for (const g of this.groups) {
+        for (const r of g.repos) seen.add(r.repoFullName);
+      }
+      return seen.size;
+    },
+
+    get totalPRs() {
+      return this.groups.reduce((s, g) => s + g.totalPRsOpened, 0);
+    },
+
+    async init() {
+      this.loading = true;
+      const res = await fetch('/api/stats/codeowners');
+      this.groups = await res.json();
+      this.loading = false;
+    },
+
+    get sortedGroups() {
+      const field = this.sortField;
+      const dir = this.sortDir === 'asc' ? 1 : -1;
+      return [...this.groups].sort((a, b) => {
+        let va, vb;
+        switch (field) {
+          case 'teamSlug':
+            va = a.teamSlug.toLowerCase();
+            vb = b.teamSlug.toLowerCase();
+            return va < vb ? -dir : va > vb ? dir : 0;
+          case 'memberCount':
+          case 'totalPRsOpened':
+          case 'prsPerEngineer':
+            va = a[field];
+            vb = b[field];
+            return (va - vb) * dir;
+          default:
+            return 0;
+        }
+      });
+    },
+
+    toggleSort(field) {
+      if (this.sortField === field) {
+        this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        this.sortField = field;
+        this.sortDir = field === 'teamSlug' ? 'asc' : 'desc';
+      }
+    },
+
+    sortIndicator(field) {
+      if (this.sortField !== field) return '';
+      return this.sortDir === 'asc' ? '\u25B2' : '\u25BC';
+    },
+
+    demandBadgeClass(prsPerEngineer) {
+      if (prsPerEngineer > 3) return 'badge badge-red';
+      if (prsPerEngineer > 1.5) return 'badge badge-yellow';
+      return 'badge badge-green';
+    },
+  };
+}
+</script>

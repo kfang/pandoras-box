@@ -1,0 +1,167 @@
+{
+  "languages": ["TypeScript", "JavaScript"],
+  "primary_language": "TypeScript",
+  "framework": "Fastify (server), Backstage (plugins)",
+  "runtime": "Node.js 22 (see Dockerfile)",
+  "package_manager": "npm (with bun.lock lockfile)",
+  "monorepo_tool": "Nx 20",
+  "workspaces": [
+    "@kfang/ghstat-server",
+    "@kfang/ghstat-github-data",
+    "@kfang/ghstat-persistence",
+    "@kfang/ghstat-stats",
+    "@kfang/ghstat-backstage-backend",
+    "@kfang/ghstat-backstage-frontend"
+  ],
+  "key_dependencies": [
+    {
+      "name": "fastify",
+      "version": "^5.0.0",
+      "purpose": "HTTP server framework"
+    },
+    {
+      "name": "@octokit/rest",
+      "version": "^20.1.1",
+      "purpose": "GitHub API client"
+    },
+    {
+      "name": "@octokit/plugin-throttling",
+      "version": "^9.3.2",
+      "purpose": "Rate limiting for GitHub API calls"
+    },
+    {
+      "name": "better-sqlite3",
+      "version": "^11.0.0",
+      "purpose": "SQLite database driver"
+    },
+    {
+      "name": "knex",
+      "version": "^3.1.0",
+      "purpose": "SQL query builder and database toolkit"
+    },
+    {
+      "name": "js-yaml",
+      "version": "^4.1.0",
+      "purpose": "YAML config file parsing"
+    },
+    {
+      "name": "@backstage/backend-plugin-api",
+      "version": "^0.6.10",
+      "purpose": "Backstage backend plugin framework"
+    },
+    {
+      "name": "@backstage/core-plugin-api",
+      "version": "^1.9.1",
+      "purpose": "Backstage frontend plugin API"
+    },
+    {
+      "name": "@backstage/core-components",
+      "version": "^0.14.4",
+      "purpose": "Backstage UI components library"
+    },
+    {
+      "name": "react",
+      "version": "^18.3.1",
+      "purpose": "React UI library (peer dependency)"
+    },
+    {
+      "name": "react-router-dom",
+      "version": "^6.23.1",
+      "purpose": "React routing library"
+    },
+    {
+      "name": "typescript",
+      "version": "^5.4.5",
+      "purpose": "TypeScript compiler"
+    },
+    {
+      "name": "nx",
+      "version": "^20.0.0",
+      "purpose": "Monorepo build system and task runner"
+    }
+  ],
+  "commands": {
+    "install": "npm install (or bun install)",
+    "run": "node packages/server/dist/index.js (after build)",
+    "build": "npm run build (or nx run-many -t build)",
+    "typecheck": "npm run typecheck (or nx run-many -t typecheck)",
+    "clean": "npm run clean (or nx run-many -t clean)",
+    "docker_build": "docker build -f packages/server/Dockerfile -t ghstat .",
+    "docker_run": "docker run -p 3000:3000 ghstat",
+    "other": [
+      {
+        "name": "start",
+        "command": "npm run -w packages/server start",
+        "description": "Run the server after building (from packages/server)"
+      }
+    ]
+  },
+  "environment_variables": [
+    {
+      "name": "GITHUB_TOKEN",
+      "required": true,
+      "description": "GitHub API token for authentication"
+    }
+  ],
+  "configuration_files": [
+    {
+      "path": "config.yaml",
+      "description": "Main application configuration (github token, repos, persistence type, server port, refresh interval)"
+    },
+    {
+      "path": "config.example.yaml",
+      "description": "Example configuration template"
+    }
+  ],
+  "docker": {
+    "base_image": "node:22-slim",
+    "exposed_ports": [3000],
+    "workdir": "/app",
+    "run_command": "docker build -f packages/server/Dockerfile -t ghstat . && docker run -p 3000:3000 ghstat",
+    "uses_corepack": true,
+    "lockfile": "bun.lock"
+  },
+  "ci_platform": "Not configured (no GitHub Actions, CircleCI, or GitLab CI workflows detected)",
+  "build_system": "Nx with TypeScript",
+  "test_framework": "Not detected",
+  "persistence": {
+    "default": "SQLite",
+    "alternatives": ["Backstage"]
+  },
+  "project_structure": {
+    "root_scripts": ["build", "typecheck", "clean"],
+    "packages": [
+      {
+        "name": "server",
+        "type": "application",
+        "description": "Fastify HTTP server with routes for stats, PRs, and repos"
+      },
+      {
+        "name": "github-data",
+        "type": "library",
+        "description": "GitHub API client wrapper with Octokit"
+      },
+      {
+        "name": "persistence",
+        "type": "library",
+        "description": "SQLite persistence layer using better-sqlite3 and knex"
+      },
+      {
+        "name": "stats",
+        "type": "library",
+        "description": "Statistics calculation utilities"
+      },
+      {
+        "name": "backstage-backend",
+        "type": "plugin",
+        "description": "Backstage backend plugin integration"
+      },
+      {
+        "name": "backstage-frontend",
+        "type": "plugin",
+        "description": "Backstage frontend plugin with React UI"
+      }
+    ]
+  },
+  "notes": "Monorepo using Nx and npm workspaces. Projects built with TypeScript and targeting ES2022. Multiple deployment targets: standalone Fastify server or Backstage plugin system. Uses bun.lock for dependency locking but managed with npm."
+}

@@ -1,0 +1,43 @@
+{
+  "org_conventions_doc": null,
+  "file_naming": "kebab-case for all source files (e.g. repo-health.ts, code-owner-demand.ts, pr-velocity.ts)",
+  "variable_naming": "camelCase for variables, functions, and parameters (e.g. repoFullName, daysSinceLastPush, fetchPullRequests)",
+  "class_naming": "PascalCase for classes and interfaces, no I-prefix convention (e.g. KnexStorageProvider, StorageProvider, Config, RepoHealthStats)",
+  "constant_naming": "SCREAMING_SNAKE_CASE for module-level constants (e.g. MAX_RETRIES, CODEOWNERS_PATHS)",
+  "test_file_naming": "No test files present in codebase; project appears to be early-stage without test coverage",
+  "async_style": "async/await throughout; AsyncGenerator pattern used for paginated API calls (e.g. async function* fetchOrgRepos), Promises used at library boundaries",
+  "error_handling": "try/catch blocks with early returns; functions throw errors to callers (e.g. fetchCodeOwnersFile catches 404 and continues, re-throws other errors). No custom error class; relies on native Error handling and status codes.",
+  "import_style": "ES modules with explicit .js extensions (e.g. import { ... } from './types.js'); path alias @ not used; absolute package imports via @kfang scoped namespace (e.g. @kfang/ghstat-github-data)",
+  "architecture": "Monorepo with Nx task orchestration. Layered by package: github-data (API client) → stats (pure calculation functions) → persistence (storage abstraction) → server/backstage plugins (consumers). Each package is independently typed and exports a clean public API via index.ts.",
+  "state_management": "Not applicable; project is backend-heavy data processing with no client-side state management. Storage is abstracted via StorageProvider interface.",
+  "code_generation": [
+    "No generated files detected. Octokit types are from npm; not code-generated locally."
+  ],
+  "pre_commit_hooks": "No pre-commit hooks (.husky, .pre-commit-config.yaml, lefthook.yml) configured",
+  "pr_conventions": "No CONTRIBUTING.md or PR templates found; no branch naming conventions documented",
+  "database_and_migrations": "Knex.js-based SQL migrations in KnexStorageProvider.buildMigrations(). Migrations are versioned and tracked in a schema_migrations table. Supports both SQLite (standalone) and Backstage database backends via adapter pattern. Run migrations automatically on first StorageProvider instantiation.",
+  "workspace_structure": "Bun monorepo with Nx. packages/ contains: github-data (Octokit API client wrapper), stats (calculation functions), persistence (storage layer + sync orchestration), server (standalone Fastify/Alpine.js server), backstage-backend (Backstage plugin), backstage-frontend (Backstage React plugin).",
+  "dependency_injection": "Manual wiring via factory functions (e.g. createSqliteProvider, createGitHubClient, createBackstageProvider). No IoC container. Consumers pass dependencies into route handlers and main index.ts.",
+  "backend_framework": "Fastify for standalone server; Express-compatible request/response for Backstage backend plugin. Routes registered via registerRepoRoutes, registerPullRoutes, registerStatRoutes pattern.",
+  "configuration": "YAML-based config (config.yaml) with environment variable expansion via ${VAR_NAME}. Config interface defines github (token, orgs, repos, lookback_days), persistence (type, sqlite path), refresh (interval, on_start), server (port, host). Loaded via loadConfig(configPath).",
+  "sync_orchestration": "syncAll(client, storage, config, logger) handles full data sync: fetches org repos, individually listed repos, PRs, reviews, comments, timeline events, CODEOWNERS, and team members. Deduplicates repos across org and individual listings. Uses incremental sync if last_sync_time exists; falls back to lookback_days for full sync.",
+  "types_and_interfaces": "Strongly typed; normalized GitHub types (GhRepo, GhPullRequest, GhPRReview, etc.) differ slightly from Octokit output to simplify consumption. StorageProvider is the storage abstraction interface. Stat calculation functions return strongly-typed result objects (RepoHealthStats, PRVelocityStats, etc.).",
+  "pagination_and_generators": "GitHub API pagination via Octokit client.paginate.iterator with AsyncGenerator (yield in for-await loops). Large datasets streamed rather than buffered.",
+  "gotchas": [
+    "No npm scripts to run the app directly—use bun run. Example: CONFIG_PATH=./config.yaml bun run packages/server/src/index.ts",
+    "Database path defaults to ./data/gh-stat.db; directory is auto-created. For Docker or alternative persistence, set config.persistence.type to 'backstage' and wire Backstage DatabaseService.",
+    "GitHub API CODEOWNERS fetching tries three standard paths (.github/CODEOWNERS, CODEOWNERS, docs/CODEOWNERS); if none exist, returns null (not an error).",
+    "Sync state is per-repo-full-name; incremental syncs rely on last_sync_time table. Manual sync via POST /api/sync does not respect syncRunning flag strictly—logs a warning but user must retry.",
+    "Stats calculation functions are pure; they do not fetch data themselves. Server and Backstage plugins orchestrate storage queries and pass data to calc* functions.",
+    "Backstage mode uses a table prefix (ghstat_) to avoid collisions in shared databases. Standalone mode uses no prefix.",
+    "bus factor calculation: contributors with >=10% of merged PRs, not total contributions."
+  ],
+  "additional_notes": [
+    "Project is in early development (v0.1.0); no tests, no CI pipeline.",
+    "Frontend code (Alpine.js views) is served from src/views/; views are copied to dist during build.",
+    "TypeScript strict mode enabled (strict: true, noUncheckedIndexedAccess, noImplicitOverride). ES2022 target.",
+    "Bun package manager used; bun.lock file present. Nx for task orchestration (nx run-many -t build, typecheck, clean).",
+    "Each package declares explicit dependencies via @kfang scoped namespace (workspace: * protocol).",
+    "No linter or formatter config (.eslintrc, .prettierrc) found; assume community defaults or style enforced via code review."
+  ]
+}

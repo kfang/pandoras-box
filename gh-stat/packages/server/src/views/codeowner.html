@@ -1,0 +1,223 @@
+<div
+  x-data="codeownerPage()"
+  x-init="init()"
+>
+  <div style="margin-bottom:8px;">
+    <a href="/codeowners">&larr; All teams</a>
+  </div>
+  <h1 x-text="teamSlug"></h1>
+
+  <!-- Time window controls -->
+  <div class="card" style="display:flex;gap:12px;align-items:center;padding:12px 16px;flex-wrap:wrap;">
+    <label style="font-size:14px;font-weight:600;">Time window:</label>
+    <input type="date" x-model="sinceDate" @change="reload()"
+      style="border:1px solid #d0d7de;border-radius:6px;padding:6px 10px;font-size:14px;" />
+    <span style="font-size:13px;color:#656d76;">to</span>
+    <input type="date" x-model="untilDate" @change="reload()"
+      style="border:1px solid #d0d7de;border-radius:6px;padding:6px 10px;font-size:14px;" />
+  </div>
+
+  <template x-if="stats">
+    <div>
+      <!-- Summary row -->
+      <div class="grid" style="margin-bottom:16px;">
+        <div class="card stat">
+          <div class="value" x-text="stats.members.length"></div>
+          <div class="label">Members</div>
+        </div>
+        <div class="card stat">
+          <div class="value" x-text="stats.repos.length"></div>
+          <div class="label">Owned repos</div>
+        </div>
+        <div class="card stat">
+          <div class="value" x-text="stats.velocity.mergedPRs"></div>
+          <div class="label">Merged PRs</div>
+        </div>
+        <div class="card stat">
+          <div class="value" x-text="stats.velocity.avgTimeToMergeLabel ?? '—'"></div>
+          <div class="label">Avg time to merge</div>
+        </div>
+        <div class="card stat">
+          <div class="value" x-text="stats.demand.groups[0]?.prsPerEngineer?.toFixed(1) ?? '—'"></div>
+          <div class="label">PRs / engineer</div>
+        </div>
+        <div class="card stat">
+          <div class="value" x-text="stats.contributors.uniqueContributors"></div>
+          <div class="label">Contributors</div>
+        </div>
+      </div>
+
+      <!-- PR Velocity -->
+      <div class="card">
+        <h2>PR Velocity (across all owned repos)</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Total PRs</td><td x-text="stats.velocity.totalPRs"></td></tr>
+            <tr><td>Merge rate</td><td x-text="(stats.velocity.mergeRate * 100).toFixed(1) + '%'"></td></tr>
+            <tr><td>p50 cycle time</td><td x-text="formatMs(stats.velocity.p50CycleTimeMs)"></td></tr>
+            <tr><td>p90 cycle time</td><td x-text="formatMs(stats.velocity.p90CycleTimeMs)"></td></tr>
+            <tr><td>Weekly throughput</td><td x-text="stats.velocity.weeklyThroughput ? stats.velocity.weeklyThroughput.toFixed(1) + ' PRs/wk' : '—'"></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Per-repo breakdown -->
+      <div class="card" style="padding:0;overflow:hidden;">
+        <h2 style="padding:16px 12px 0 12px;">Repos</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Repository</th>
+              <th>PRs/day</th>
+              <th>PRs/wk</th>
+              <th>Merged</th>
+              <th>Avg merge time</th>
+              <th>Familiarity</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="r in stats.perRepo" :key="r.repoFullName">
+              <tr>
+                <td>
+                  <a :href="'/repo/' + r.repoFullName" x-text="r.repoFullName"></a>
+                </td>
+                <td x-text="r.demand.avgPRsPerDay.toFixed(2)"></td>
+                <td x-text="r.demand.avgPRsPerWeek.toFixed(1)"></td>
+                <td x-text="r.velocity.mergedPRs"></td>
+                <td x-text="r.velocity.avgTimeToMergeLabel ?? '—'"></td>
+                <td>
+                  <template x-if="r.familiarityPct !== null">
+                    <span
+                      :class="r.familiarityPct >= 70 ? 'badge badge-green' : r.familiarityPct >= 40 ? 'badge badge-yellow' : 'badge badge-red'"
+                      x-text="r.familiarityPct.toFixed(0) + '%'"
+                    ></span>
+                  </template>
+                  <span x-show="r.familiarityPct === null" style="color:#656d76;">—</span>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Member activity -->
+      <div class="card" style="padding:0;overflow:hidden;">
+        <h2 style="padding:16px 12px 0 12px;">Member Activity</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Member</th>
+              <th>Total PRs</th>
+              <th>Merged</th>
+              <th>Active repos</th>
+              <th>Last PR</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="m in stats.memberActivity" :key="m.login">
+              <tr>
+                <td x-text="m.login"></td>
+                <td x-text="m.totalPRs"></td>
+                <td x-text="m.mergedPRs"></td>
+                <td x-text="m.activeRepos"></td>
+                <td x-text="m.lastPRDate ? new Date(m.lastPRDate).toLocaleDateString() : '—'"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Top contributors (may include non-team members) -->
+      <div class="card">
+        <h2>Top Contributors (all authors in owned repos)</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Merged</th>
+              <th>Open</th>
+              <th>Merge rate</th>
+              <th>Additions</th>
+              <th>Deletions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="c in stats.contributors.contributors.slice(0, 20)" :key="c.login">
+              <tr>
+                <td>
+                  <span x-text="c.login"></span>
+                  <span x-show="stats.members.includes(c.login)" class="badge badge-green" style="margin-left:4px;">team</span>
+                </td>
+                <td x-text="c.mergedPRs"></td>
+                <td x-text="c.openPRs"></td>
+                <td x-text="(c.mergeRate * 100).toFixed(0) + '%'"></td>
+                <td x-text="'+' + c.totalAdditions.toLocaleString()"></td>
+                <td x-text="'-' + c.totalDeletions.toLocaleString()"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </template>
+
+  <div x-show="loading" style="color:#656d76;padding:24px;">Loading…</div>
+  <div x-show="error" x-text="error" style="color:#cf222e;padding:24px;"></div>
+</div>
+
+<script>
+function codeownerPage() {
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  // Path: /codeowners/:org/:teamSlug
+  const pathParts = location.pathname.replace('/codeowners/', '');
+  const slashIdx = pathParts.indexOf('/');
+  const org = pathParts.substring(0, slashIdx);
+  const teamSlug = pathParts.substring(slashIdx + 1);
+
+  return {
+    org,
+    teamSlug,
+    stats: null,
+    loading: false,
+    error: null,
+    sinceDate: thirtyDaysAgo.toISOString().split('T')[0],
+    untilDate: now.toISOString().split('T')[0],
+
+    async init() {
+      await this.reload();
+    },
+
+    async reload() {
+      this.loading = true;
+      this.error = null;
+      const params = new URLSearchParams();
+      if (this.sinceDate) params.set('since', this.sinceDate);
+      if (this.untilDate) params.set('until', this.untilDate);
+      const qs = params.toString();
+      const res = await fetch(`/api/stats/codeowners/${this.org}/${this.teamSlug}${qs ? '?' + qs : ''}`);
+      if (!res.ok) {
+        this.error = 'Failed to load stats for ' + this.teamSlug;
+      } else {
+        this.stats = await res.json();
+      }
+      this.loading = false;
+    },
+
+    formatMs(ms) {
+      if (ms === null || ms === undefined) return '—';
+      const hours = ms / (1000 * 60 * 60);
+      if (hours < 24) return hours.toFixed(1) + 'h';
+      const days = hours / 24;
+      if (days < 7) return days.toFixed(1) + 'd';
+      return (days / 7).toFixed(1) + 'w';
+    },
+  };
+}
+</script>

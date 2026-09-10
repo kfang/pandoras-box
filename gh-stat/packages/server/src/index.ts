@@ -89,6 +89,15 @@ app.get("/repo/*", async (req, reply) => {
   return reply.type("text/html").send(serveView("repo", repoName));
 });
 
+app.get("/codeowners", async (_req, reply) => {
+  return reply.type("text/html").send(serveView("codeowners", "Code Owners"));
+});
+
+app.get("/codeowners/*", async (req, reply) => {
+  const teamPath = (req.params as Record<string, string>)["*"] ?? "";
+  return reply.type("text/html").send(serveView("codeowner", teamPath));
+});
+
 app.listen({ port: config.server.port, host: config.server.host }, (err, address) => {
   if (err) {
     console.error(err);

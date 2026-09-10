@@ -1,0 +1,109 @@
+{
+  "project_root_files": [
+    "package.json",
+    "bun.lock",
+    "tsconfig.base.json",
+    "nx.json",
+    "README.md",
+    "SPEC.md",
+    "config.yaml",
+    "config.example.yaml",
+    ".gitignore",
+    ".idea",
+    ".nx",
+    ".claude",
+    ".data",
+    "packages",
+    "node_modules"
+  ],
+  "source_directories": [
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/packages/github-data",
+      "description": "GitHub API client library with fetching functions for repos, PRs, teams, and CODEOWNERS parsing"
+    },
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/packages/stats",
+      "description": "Pure stat calculation functions for PR velocity, contributors, repo health, review cycles, and related metrics"
+    },
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/packages/persistence",
+      "description": "Storage abstraction layer for SQLite or Backstage DB persistence, and sync orchestration logic"
+    },
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/packages/server",
+      "description": "Standalone Bun HTTP server with Fastify, REST API routes, HTML views, and dashboard frontend"
+    },
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/packages/backstage-backend",
+      "description": "Backstage backend plugin implementation for gh-stat integration"
+    },
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/packages/backstage-frontend",
+      "description": "Backstage frontend plugin with React components for UI dashboards"
+    }
+  ],
+  "entrypoints": [
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/packages/server/src/index.ts",
+      "description": "Standalone server entry point — initializes Fastify HTTP server, loads config, sets up GitHub client, manages data sync, and registers API routes"
+    },
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/packages/backstage-backend/src/index.ts",
+      "description": "Backstage backend plugin entry point"
+    },
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/packages/backstage-frontend/src/index.ts",
+      "description": "Backstage frontend plugin entry point"
+    },
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/packages/github-data/src/index.ts",
+      "description": "GitHub data package exports — client factory and fetch functions"
+    },
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/packages/stats/src/index.ts",
+      "description": "Stats package exports — all calculation functions and return types"
+    }
+  ],
+  "feature_directories": [
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/packages/server/src/routes",
+      "description": "HTTP route handlers for repos, pulls, and stats endpoints"
+    },
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/packages/server/src/views",
+      "description": "HTML view templates (layout.html, index.html, repo.html) for dashboard UI"
+    },
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/packages/backstage-frontend/src/components",
+      "description": "React components for Backstage UI (dashboards, tables, cards)"
+    },
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/packages/github-data/src",
+      "description": "GitHub API client and data fetching modules (client.ts, repos.ts, pulls.ts, teams.ts, codeowners.ts, types.ts)"
+    },
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/packages/stats/src",
+      "description": "Stat calculation modules (pr-velocity, contributors, repo-health, review-cycle, comment-analysis, and more)"
+    },
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/packages/persistence/src",
+      "description": "Storage interface and sync orchestration (storage.ts, sync.ts, types.ts)"
+    }
+  ],
+  "test_locations": [],
+  "infrastructure_dirs": [
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/.github",
+      "description": "CI/CD and GitHub Actions workflows"
+    },
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/.nx",
+      "description": "Nx workspace configuration and caching"
+    },
+    {
+      "path": "/Users/kevin.fang/projects/_playground/pandoras-box/gh-stat/packages/server",
+      "description": "Dockerfile for containerized deployment"
+    }
+  ],
+  "app_summary": "A GitHub analytics platform that fetches repository and PR data via the GitHub API, caches it in SQLite, computes team and org metrics (PR velocity, cycle times, contributor breakdowns, code ownership analysis), and exposes them via a standalone Bun HTTP server or Backstage plugin with dashboards and REST APIs."
+}
