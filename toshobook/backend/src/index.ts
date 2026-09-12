@@ -1,9 +1,7 @@
-import fs from "node:fs";
-import { ComicInfo } from "./comicinfo.ts";
-import sevenZ from "./sevenZ.ts";
-import xxHash from "@node-rs/xxhash";
-import { Config, ConfigProvider, Effect, FileSystem, Path, Schema, Stream } from "effect";
+import { Config, ConfigProvider, Console, Effect, FileSystem, Path, Schema } from "effect";
 import { NodeServices } from "@effect/platform-node";
+import { extractFileFromArchive, calculateFileHash } from "./utils.ts";
+import { ComicInfo } from "./comicinfo.ts";
 
 const configSchema = Schema.Struct({
   IMPORT_DIR: Schema.NonEmptyString,
@@ -21,47 +19,45 @@ const configProgram = Effect.gen(function* () {
   return config;
 });
 
-const cbzFiles = Effect.gen(function* () {
-  const config = yield* configProgram;
+const cbzFiles = (importDir: string) => Effect.gen(function* () {
   const filesys = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
 
-  const isFile = (filepath: string) => Effect.gen(function* () {
-    const fStat = yield* filesys.stat(filepath);
-    return fStat.type === "File";
-  });
-
-  const pattern = path.join(config.IMPORT_DIR, "**", "*.cbz");
-  const cbzFileStream = Stream
-    .fromIterableEffect(filesys.glob(pattern))
-    .pipe(Stream.filterEffect(isFile));
-
-  const filtered = yield* Stream.runCollect(cbzFileStream);
-
-  return filtered;
+  const pattern = path.join(importDir, "**", "*.cbz");
+  return yield* filesys.glob(pattern);
 });
 
-const fxs = await Effect.runPromise(cbzFiles.pipe(Effect.provide(NodeServices.layer)));
+const processFile = (filepath: string) => Effect.gen(function* () {
+  const log = yield* Console.Console;
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
 
-for (const f of fxs) {
-  console.log(`processing: ${f}`);
-
-  const dataStream = fs.createReadStream(f);
-  const hasher = xxHash.xxh3.Xxh3.withSeed();
-  for await (const chunk of dataStream) {
-    hasher.update(chunk);
-  }
-  const fileHash = hasher.digest().toString(16).padStart(16, "0");
-  console.log(`\tfileHash: ${fileHash}`);
-
-  console.log(`\textracting ComicInfo.xml`);
-  const comicInfoXml = await sevenZ.extractFile(f, "ComicInfo.xml");
-  if (!comicInfoXml) {
-    continue;
+  const fStat = yield* fs.stat(filepath);
+  if (fStat.type !== "File") {
+    return;
   }
 
-  const ci = ComicInfo.parse(comicInfoXml);
-  if (!ci) {
-    continue;
+  const fileName = path.basename(filepath);
+  const fileHash = yield* calculateFileHash(filepath);
+  const fileBytes = fStat.size;
+
+  const raw = yield* extractFileFromArchive(filepath, "ComicInfo.xml");
+  const ci = ComicInfo.parse(raw);
+
+  log.info(filepath);
+  log.info(`\tname: ${fileName}`);
+  log.info(`\tsize: ${fileBytes} bytes`);
+  log.info(`\thash: ${fileHash}`);
+  log.info(raw);
+});
+
+const program = Effect.gen(function* () {
+  const config = yield* configProgram;
+  const cbzFilePaths = yield* cbzFiles(config.IMPORT_DIR)
+
+  for (const filepath of cbzFilePaths) {
+    yield* processFile(filepath);
   }
-}
+});
+
+await Effect.runPromise(program.pipe(Effect.provide(NodeServices.layer)));
