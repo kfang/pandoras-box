@@ -1,9 +1,10 @@
-import { Config, ConfigProvider, Console, Effect, FileSystem, Path, Schema } from "effect";
+import { Config, ConfigProvider, Console, Effect, FileSystem, Option, Path, Schema } from "effect";
 import { NodeServices } from "@effect/platform-node";
-import { extractFileFromArchive, calculateFileHash } from "./utils.ts";
-import { ComicInfo } from "./comicinfo.ts";
+import { calculateFileHash } from "./utils.ts";
+import { extractComicInfoFromArchive } from "./comicinfo.ts";
 
 const configSchema = Schema.Struct({
+  DATA_DIR: Schema.NonEmptyString,
   IMPORT_DIR: Schema.NonEmptyString,
   COMICS_DIR: Schema.NonEmptyString,
 });
@@ -27,28 +28,32 @@ const cbzFiles = (importDir: string) => Effect.gen(function* () {
   return yield* filesys.glob(pattern);
 });
 
-const processFile = (filepath: string) => Effect.gen(function* () {
+const processFile = (archivepath: string) => Effect.gen(function* () {
   const log = yield* Console.Console;
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
 
-  const fStat = yield* fs.stat(filepath);
+  const fStat = yield* fs.stat(archivepath);
   if (fStat.type !== "File") {
     return;
   }
 
-  const fileName = path.basename(filepath);
-  const fileHash = yield* calculateFileHash(filepath);
+  const fileName = path.basename(archivepath);
+  const fileHash = yield* calculateFileHash(archivepath);
   const fileBytes = fStat.size;
+  const comicInfo = yield* Effect.match(extractComicInfoFromArchive(archivepath), {
+    onSuccess: (ci) => Option.some(ci),
+    onFailure: (er) => {
+      log.warn(er);
+      return Option.none();
+    },
+  });
 
-  const raw = yield* extractFileFromArchive(filepath, "ComicInfo.xml");
-  const ci = ComicInfo.parse(raw);
-
-  log.info(filepath);
+  log.info(archivepath);
   log.info(`\tname: ${fileName}`);
   log.info(`\tsize: ${fileBytes} bytes`);
   log.info(`\thash: ${fileHash}`);
-  log.info(raw);
+  log.info(comicInfo);
 });
 
 const program = Effect.gen(function* () {

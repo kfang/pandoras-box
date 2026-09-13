@@ -1,13 +1,24 @@
-import { Effect, FileSystem } from "effect";
+import { Data, Effect, FileSystem } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import xxHash from "@node-rs/xxhash";
+
+
+class ArchiveFileNotFound extends Data.TaggedError("ArchiveFileNotFound")<{
+  readonly archivePath: string;
+  readonly filePath: string;
+}> { }
+
 
 const sevenZipCmd = "7zz";
 
 export const extractFileFromArchive = (archivePath: string, filePath: string) => Effect.gen(function* () {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const cmd = ChildProcess.make(sevenZipCmd, ["x", archivePath, filePath, "-so"]);
-  return yield* spawner.string(cmd);
+  const raw = yield* spawner.string(cmd);
+
+  return raw
+    ? yield* Effect.succeed(raw)
+    : yield* Effect.fail(new ArchiveFileNotFound({ archivePath, filePath }));
 });
 
 export const calculateFileHash = (filepath: string) => Effect.gen(function* () {
