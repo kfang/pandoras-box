@@ -12,8 +12,22 @@ export interface FilesTable {
   checked_at: string;
 }
 
+export interface JobTable {
+  id: Generated<number>;
+  key: string;
+  kind: string;
+  payload: string;
+  created_at: string;
+
+  taken_at?: string;
+  completed_at?: string;
+  result?: "failure" | "success",
+  error?: string;
+}
+
 export interface Database {
   files: FilesTable;
+  jobs: JobTable;
 }
 
 export class DatabaseService extends Context.Service<

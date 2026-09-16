@@ -33,9 +33,7 @@ const program = Effect.gen(function* () {
   const config = yield* configProgram;
   const cbzFilePaths = yield* cbzFiles(config.IMPORT_DIR)
 
-  for (const filepath of cbzFilePaths) {
-    yield* processImportFile(filepath);
-  }
+  yield* Effect.all(cbzFilePaths.map(processImportFile), { concurrency: 10 });
 });
 
 const runnable = Effect.provide(

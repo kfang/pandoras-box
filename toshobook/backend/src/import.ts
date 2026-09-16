@@ -18,10 +18,11 @@ export const processImportFile = (archivepath: string) => Effect.gen(function* (
     .map(fStat.mtime, (d) => d.toISOString())
     .pipe(Option.getOrUndefined);
 
-  log.info(archivepath);
-  log.info(`\tname: ${fileName}`);
-  log.info(`\tsize: ${fileBytes} bytes`);
-  log.info(`\thash: ${fileHash}`);
-  log.info(`\tmtim: ${fileMTime}`);
+  log.info(`
+${archivepath}
+  \tname: ${fileName}
+  \tsize: ${fileBytes} bytes
+  \thash: ${fileHash}
+  \tmtim: ${fileMTime}`);
 });
 
