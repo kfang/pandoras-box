@@ -2,6 +2,7 @@ import { Config, ConfigProvider, Effect, FileSystem, Layer, Path, Schema } from 
 import { NodeServices } from "@effect/platform-node";
 import { processImportFile } from "./import.ts";
 import { DatabaseServiceLive } from "./db/Database.ts";
+import { JobRepositoryLive } from "./db/JobRepository.ts";
 
 const configSchema = Schema.Struct({
   COMICS_DIR: Schema.NonEmptyString,
@@ -36,8 +37,17 @@ const program = Effect.gen(function* () {
   yield* Effect.all(cbzFilePaths.map(processImportFile), { concurrency: 10 });
 });
 
-const runnable = Effect.provide(
-  program,
-  Layer.merge(NodeServices.layer, DatabaseServiceLive.pipe(Layer.provide(NodeServices.layer))),
-);
+const CoreLive = Layer
+  .mergeAll(
+    NodeServices.layer,
+  );
+
+const RepositoryLive = Layer
+  .mergeAll(JobRepositoryLive)
+  .pipe(
+    Layer.provideMerge(CoreLive),
+    Layer.provide(DatabaseServiceLive.pipe(Layer.provide(CoreLive))),
+  )
+
+const runnable = Effect.provide(program, RepositoryLive);
 await Effect.runPromise(runnable);

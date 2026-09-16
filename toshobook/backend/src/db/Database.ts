@@ -26,8 +26,8 @@ export interface JobTable {
 }
 
 export interface Database {
-  files: FilesTable;
-  jobs: JobTable;
+  file: FilesTable;
+  job: JobTable;
 }
 
 export class DatabaseService extends Context.Service<
