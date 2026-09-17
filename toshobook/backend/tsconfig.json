@@ -1,10 +1,15 @@
 {
   "extends": [
-    "@tsconfig/bases/node-ts",
-    "@tsconfig/bases/strictest",
-    "@tsconfig/bases/node26"
+    "@tsconfig/strictest/tsconfig.json",
+    "@tsconfig/node26/tsconfig.json",
+    "@tsconfig/node-ts/tsconfig.json",
   ],
   "compilerOptions": {
+    "lib": [
+      "es2025",
+      "ESNext.Collection",
+      "ESNext.Temporal"
+    ],
     "noEmit": true,
   }
 }

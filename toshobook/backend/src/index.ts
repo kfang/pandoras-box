@@ -1,8 +1,8 @@
-import { Config, ConfigProvider, Effect, FileSystem, Layer, Path, Schema } from "effect";
+import { Config, ConfigProvider, Console, Effect, FileSystem, Layer, Option, Path, Schema } from "effect";
 import { NodeServices } from "@effect/platform-node";
 import { processImportFile } from "./import.ts";
 import { DatabaseServiceLive } from "./db/Database.ts";
-import { JobRepositoryLive } from "./db/JobRepository.ts";
+import { JobRepository, JobRepositoryLive } from "./db/JobRepository.ts";
 
 const configSchema = Schema.Struct({
   COMICS_DIR: Schema.NonEmptyString,
@@ -31,9 +31,15 @@ const cbzFiles = (importDir: string) => Effect.gen(function* () {
 });
 
 const program = Effect.gen(function* () {
+  const jobRepository = yield* JobRepository;
+  yield* jobRepository.addJob({ job_key: "scan_import", job_kind: "SCAN_IMPORT", payload: {} });
+
+  const log = yield* Console.Console;
+  const job = yield* jobRepository.takeJob();
+  log.info(Option.getOrNull(job));
+
   const config = yield* configProgram;
   const cbzFilePaths = yield* cbzFiles(config.IMPORT_DIR)
-
   yield* Effect.all(cbzFilePaths.map(processImportFile), { concurrency: 10 });
 });
 

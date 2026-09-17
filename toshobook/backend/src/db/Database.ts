@@ -14,8 +14,8 @@ export interface FilesTable {
 
 export interface JobTable {
   id: Generated<number>;
-  key: string;
-  kind: string;
+  job_key: string;
+  job_kind: string;
   payload: string;
   created_at: string;
 
