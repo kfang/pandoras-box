@@ -1,4 +1,4 @@
-import { Config, ConfigProvider, Console, Effect, FileSystem, Layer, Option, Path, Schema } from "effect";
+import { Config, ConfigProvider, Console, Effect, Fiber, FileSystem, Layer, Option, Path, Schedule, Schema } from "effect";
 import { NodeServices } from "@effect/platform-node";
 import { processImportFile } from "./import.ts";
 import { DatabaseServiceLive } from "./db/Database.ts";
@@ -10,7 +10,7 @@ const configSchema = Schema.Struct({
   IMPORT_DIR: Schema.NonEmptyString,
 });
 
-const configProgram = Effect.gen(function* () {
+const configProgram = Effect.gen(function*() {
   const filesys = yield* FileSystem.FileSystem;
   const provider = yield* ConfigProvider.fromDotEnv();
   const config = yield* Config.schema(configSchema).parse(provider);
@@ -22,7 +22,7 @@ const configProgram = Effect.gen(function* () {
   return config;
 });
 
-const cbzFiles = (importDir: string) => Effect.gen(function* () {
+const cbzFiles = (importDir: string) => Effect.gen(function*() {
   const filesys = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
 
@@ -30,17 +30,57 @@ const cbzFiles = (importDir: string) => Effect.gen(function* () {
   return yield* filesys.glob(pattern);
 });
 
-const program = Effect.gen(function* () {
+const worker = Effect.repeat(
+  Effect.gen(function*() {
+    const jobRepository = yield* JobRepository;
+    const log = yield* Console.Console;
+    const job = yield* jobRepository.takeJob();
+
+    if (!job) {
+      return;
+    }
+
+    if (job.job_kind === "SCAN_IMPORT") {
+      const config = yield* configProgram;
+      const cbzFilePaths = yield* cbzFiles(config.IMPORT_DIR)
+
+      for (const fp of cbzFilePaths) {
+        yield* jobRepository.addJob({
+          job_key: `calculate_file_hash:${fp}`,
+          job_kind: "CALCULATE_FILE_HASH",
+          payload: JSON.stringify({ filepath: fp }),
+          created_at: new Date().toISOString(),
+        });
+      }
+    } else if (job.job_kind === "CALCULATE_FILE_HASH") {
+      const payload = JSON.parse(job.payload);
+      yield* processImportFile(payload.filepath);
+    } else {
+      log.debug(job);
+    }
+
+    yield* jobRepository.deleteJob(job.id);
+  }),
+  Schedule.forever.pipe(Schedule.addDelay(() => Effect.succeed("1000 millis"))),
+)
+
+const program = Effect.gen(function*() {
   const jobRepository = yield* JobRepository;
-  yield* jobRepository.addJob({ job_key: "scan_import", job_kind: "SCAN_IMPORT", payload: {} });
 
-  const log = yield* Console.Console;
-  const job = yield* jobRepository.takeJob();
-  log.info(Option.getOrNull(job));
+  yield* jobRepository.addJob({
+    job_key: "scan_import",
+    job_kind: "SCAN_IMPORT",
+    payload: "",
+    created_at: new Date().toISOString(),
+  });
 
-  const config = yield* configProgram;
-  const cbzFilePaths = yield* cbzFiles(config.IMPORT_DIR)
-  yield* Effect.all(cbzFilePaths.map(processImportFile), { concurrency: 10 });
+  const workers = Effect.all(
+    Array.from({ length: 10 }).map(() => worker),
+    { concurrency: "unbounded" },
+  );
+
+  const fiber = yield* Effect.forkChild(workers);
+  yield* Fiber.join(fiber);
 });
 
 const CoreLive = Layer

@@ -1,5 +1,6 @@
-import { Context, Effect, Layer, Option } from "effect";
-import { DatabaseService } from "./Database.ts";
+import { Context, Effect, Layer } from "effect";
+import { DatabaseService, type JobTable } from "./Database.ts";
+import type { Insertable, Selectable } from "kysely";
 
 interface JobBase {
   readonly id: number;
@@ -24,36 +25,33 @@ interface CalculateFilehashJob extends JobBase {
 }
 
 type Job = ScanImportJob | CalculateFilehashJob;
-type AddJobPayload = Pick<Job, "job_key" | "job_kind" | "payload">;
+
+type AddJobPayload = Insertable<JobTable>;
 
 export class JobRepository extends Context.Service<
   JobRepository,
   {
     readonly addJob: (job: AddJobPayload) => Effect.Effect<void>;
-    readonly takeJob: () => Effect.Effect<Option.Option<Job>>;
+    readonly deleteJob: (id: number) => Effect.Effect<void>;
+    readonly takeJob: () => Effect.Effect<Selectable<JobTable> | undefined>;
   }
 >()("JobRepository") { }
 
 export const JobRepositoryLive = Layer.effect(
   JobRepository,
-  Effect.gen(function* () {
+  Effect.gen(function*() {
     const { db } = yield* DatabaseService;
 
-    const addJob = (job: AddJobPayload) => Effect.promise(() => {
-      return db
+    const addJob = (job: AddJobPayload): Effect.Effect<void> => Effect.promise(async () => {
+      await db
         .insertInto("job")
-        .values({
-          job_key: job.job_key,
-          job_kind: job.job_kind,
-          payload: JSON.stringify(job.payload),
-          created_at: new Date().toISOString(),
-        })
+        .values(job)
         .execute();
     });
 
-    const takeJob = (): Effect.Effect<Option.Option<Job>> => Effect.gen(function* () {
-      const cutoff = Temporal.Now.instant().subtract({ minutes: 15 }).toString();
-      const job = yield* Effect.promise(() => db.updateTable("job")
+    const takeJob = (): Effect.Effect<Selectable<JobTable> | undefined> => Effect.gen(function*() {
+      const cutoff = Temporal.Now.instant().subtract({ minutes: 5 }).toString();
+      return yield* Effect.promise(() => db.updateTable("job")
         .set({ taken_at: new Date().toISOString() })
         .where((eb) =>
           eb("id", "=", eb
@@ -72,21 +70,20 @@ export const JobRepositoryLive = Layer.effect(
         .returningAll()
         .executeTakeFirst()
       );
-      return job ? Option.some<Job>({
-        id: job.id,
-        job_key: job.job_key as any,
-        job_kind: job.job_kind as any,
-        payload: JSON.parse(job.payload) as any,
-        created_at: new Date(job.created_at),
-        taken_at: job.taken_at,
-        completed_at: job.completed_at,
-        result: job.result,
-        error: job.error,
-      }) : Option.none<Job>();
+    });
+
+    const deleteJob = (id: number) => Effect.promise(async () => {
+      const r = await db
+        .deleteFrom("job")
+        .where("id", "=", id)
+        .execute();
+
+      console.log(r);
     });
 
     return {
       addJob,
+      deleteJob,
       takeJob,
     };
   }),
