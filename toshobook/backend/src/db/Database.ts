@@ -8,7 +8,8 @@ export interface FilesTable {
   path: string;
   size: number;
   mtime: string | null;
-  hash: Uint8Array | null;
+  hash: string;
+  extension: string;
   checked_at: string;
 }
 
@@ -42,7 +43,7 @@ export class DatabaseMigrationFailure extends Data.TaggedError("DatabaseMigratio
   readonly cause: unknown;
 }> { }
 
-const migrationResult = (db: Kysely<Database>) => Effect.gen(function* () {
+const migrationResult = (db: Kysely<Database>) => Effect.gen(function*() {
   const log = yield* Console.Console;
   const filesys = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -74,11 +75,15 @@ const migrationResult = (db: Kysely<Database>) => Effect.gen(function* () {
 
 export const DatabaseServiceLive = Layer.effect(
   DatabaseService,
-  Effect.gen(function* () {
+  Effect.gen(function*() {
     const db = yield* Effect.acquireRelease(
-      Effect.gen(function* () {
+      Effect.gen(function*() {
         // TODO: grab configuration
-        const database = new SQLite(":memory:");
+        const database = new SQLite(":memory:")
+          .exec("PRAGMA journal_mode = WAL;")
+          .exec("PRAGMA synchronous = NORMAL;")
+          .exec("PRAGMA busy_timeout = 10000;")
+          .exec("PRAGMA foreign_keys = ON;");
         const dialect = new SqliteDialect({ database });
         const db = new Kysely<Database>({ dialect });
 

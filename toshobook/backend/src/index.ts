@@ -1,8 +1,9 @@
 import { Config, ConfigProvider, Console, Effect, Fiber, FileSystem, Layer, Option, Path, Schedule, Schema } from "effect";
 import { NodeServices } from "@effect/platform-node";
-import { processImportFile } from "./import.ts";
 import { DatabaseServiceLive } from "./db/Database.ts";
-import { JobRepository, JobRepositoryLive } from "./db/JobRepository.ts";
+import { JobRepository } from "./db/JobRepository.ts";
+import { calculateFileHash } from "./utils.ts";
+import { FileRepository } from "./db/FileRepository.ts";
 
 const configSchema = Schema.Struct({
   COMICS_DIR: Schema.NonEmptyString,
@@ -22,14 +23,6 @@ const configProgram = Effect.gen(function*() {
   return config;
 });
 
-const cbzFiles = (importDir: string) => Effect.gen(function*() {
-  const filesys = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-
-  const pattern = path.join(importDir, "**", "*.cbz");
-  return yield* filesys.glob(pattern);
-});
-
 const worker = Effect.repeat(
   Effect.gen(function*() {
     const jobRepository = yield* JobRepository;
@@ -42,7 +35,11 @@ const worker = Effect.repeat(
 
     if (job.job_kind === "SCAN_IMPORT") {
       const config = yield* configProgram;
-      const cbzFilePaths = yield* cbzFiles(config.IMPORT_DIR)
+      const filesys = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+
+      const pattern = path.join(config.IMPORT_DIR, "**", "*.cbz");
+      const cbzFilePaths = yield* filesys.glob(pattern);
 
       for (const fp of cbzFilePaths) {
         yield* jobRepository.addJob({
@@ -52,14 +49,38 @@ const worker = Effect.repeat(
           created_at: new Date().toISOString(),
         });
       }
-    } else if (job.job_kind === "CALCULATE_FILE_HASH") {
-      const payload = JSON.parse(job.payload);
-      yield* processImportFile(payload.filepath);
-    } else {
-      log.debug(job);
     }
 
-    yield* jobRepository.deleteJob(job.id);
+    if (job.job_kind === "CALCULATE_FILE_HASH") {
+      const fs = yield* FileSystem.FileSystem;
+      const fileRepository = yield* FileRepository;
+
+      const { filepath } = JSON.parse(job.payload);
+      const fStat = yield* fs.stat(filepath);
+      if (fStat.type !== "File") {
+        return;
+      }
+
+      const extension = filepath.split(".").at(-1)?.toUpperCase();
+      const hash = yield* calculateFileHash(filepath);
+      const size = Number(fStat.size);
+      const fileMTime = Option
+        .map(fStat.mtime, (d) => d.toISOString())
+        .pipe(Option.getOrNull);
+
+      const r1 = yield* fileRepository.addFile({
+        path: filepath,
+        size,
+        mtime: fileMTime,
+        hash,
+        extension,
+        checked_at: Temporal.Now.instant().toString(),
+      });
+
+      log.info(`${JSON.stringify(r1)}\n----`);
+    }
+
+    yield* jobRepository.finishJob(job.id);
   }),
   Schedule.forever.pipe(Schedule.addDelay(() => Effect.succeed("1000 millis"))),
 )
@@ -89,7 +110,10 @@ const CoreLive = Layer
   );
 
 const RepositoryLive = Layer
-  .mergeAll(JobRepositoryLive)
+  .mergeAll(
+    JobRepository.layer,
+    FileRepository.layer,
+  )
   .pipe(
     Layer.provideMerge(CoreLive),
     Layer.provide(DatabaseServiceLive.pipe(Layer.provide(CoreLive))),

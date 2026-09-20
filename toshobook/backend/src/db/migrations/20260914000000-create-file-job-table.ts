@@ -7,7 +7,8 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .addColumn("path", "text", (col) => col.notNull().unique())
     .addColumn("size", "integer", (col) => col.notNull())
     .addColumn("mtime", "text")
-    .addColumn("hash", "blob")
+    .addColumn("hash", "text")
+    .addColumn("extension", "text")
     .addColumn("checked_at", "text", (col) => col.notNull())
     .execute();
 
