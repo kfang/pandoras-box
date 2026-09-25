@@ -526,17 +526,16 @@ func (s *Server) handleRotate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-		if rawExtensions[ext] {
-			orientation := map[int]string{90: "6", 180: "3", 270: "8"}[req.Angle]
-			targetPath := filePath
-			xmpPath := filePath[:len(filePath)-len(ext)] + ".xmp"
-			if _, err := os.Stat(xmpPath); err == nil {
-				targetPath = xmpPath
-			}
-			if out, err := exec.Command("exiftool", "-overwrite_original", "-n", "-Orientation="+orientation, targetPath).CombinedOutput(); err != nil {
-				log.Printf("failed to set orientation on %s: %s", targetPath, string(out))
-			}
-		},
+	if rawExtensions[ext] {
+		orientation := map[int]string{90: "6", 180: "3", 270: "8"}[req.Angle]
+		targetPath := filePath
+		xmpPath := filePath[:len(filePath)-len(ext)] + ".xmp"
+		if _, err := os.Stat(xmpPath); err == nil {
+			targetPath = xmpPath
+		}
+		if out, err := exec.Command("exiftool", "-overwrite_original", "-n", "-Orientation="+orientation, targetPath).CombinedOutput(); err != nil {
+			log.Printf("failed to set orientation on %s: %s", targetPath, string(out))
+		}
 		// Delete cached preview so it's re-extracted with orientation applied
 		previewDir := filepath.Join(s.libraryDir, ".previews")
 		os.Remove(thumbnail.PreviewPath(filePath, previewDir))
