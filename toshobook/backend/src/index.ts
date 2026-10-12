@@ -2,7 +2,7 @@ import { Config, ConfigProvider, Console, Effect, Fiber, FileSystem, Layer, Opti
 import { NodeServices } from "@effect/platform-node";
 import { DatabaseServiceLive } from "./db/Database.ts";
 import { JobRepository } from "./db/JobRepository.ts";
-import { calculateFileHash } from "./utils.ts";
+import { calculateFileHash, extractFileFromArchive } from "./utils.ts";
 import { FileRepository } from "./db/FileRepository.ts";
 
 const configSchema = Schema.Struct({
@@ -77,7 +77,14 @@ const worker = Effect.repeat(
         checked_at: Temporal.Now.instant().toString(),
       });
 
-      log.info(`${JSON.stringify(r1)}\n----`);
+      let metaContent = "";
+      if (extension === "CBZ") {
+        const metaFileFormat = "ComicInfo.xml";
+        metaContent = yield* extractFileFromArchive(filepath, metaFileFormat)
+          .pipe(Effect.orElseSucceed(() => ""));
+      }
+
+      log.info(`${JSON.stringify(r1)}\n${metaContent}\n----`);
     }
 
     yield* jobRepository.finishJob(job.id);

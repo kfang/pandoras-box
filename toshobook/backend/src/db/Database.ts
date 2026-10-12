@@ -9,7 +9,6 @@ export interface FilesTable {
   size: number;
   mtime: string | null;
   hash: string;
-  extension: string;
   checked_at: string;
 }
 

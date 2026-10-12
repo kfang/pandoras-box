@@ -6,10 +6,10 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .addColumn("id", "integer", (col) => col.primaryKey().autoIncrement())
     .addColumn("path", "text", (col) => col.notNull().unique())
     .addColumn("size", "integer", (col) => col.notNull())
+    .addColumn("checked_at", "text", (col) => col.notNull())
+    .addColumn("imported_at", "text")
     .addColumn("mtime", "text")
     .addColumn("hash", "text")
-    .addColumn("extension", "text")
-    .addColumn("checked_at", "text", (col) => col.notNull())
     .execute();
 
   await db.schema
